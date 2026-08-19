@@ -53,8 +53,32 @@ def data_dir(sub: str = "") -> Path:
 
 AUTH_STATE_PATH = data_dir("auth_state.json")
 
-DOUYIN_DATA_DIR = Path(r"E:\租房\tools\MediaCrawler\browser_data\dy_user_data_dir")
-DOUBAN_PROFILE_DIR = Path(r"E:\租房\tools\douban-profile")
+
+def tools_dir(sub: str = "") -> Path:
+    """第三方工具根目录（MediaCrawler / asr-venv / 模型 / playwright 内核 /
+    douban-profile 都在其下）。
+
+    与 data_dir 同模式：优先环境变量 RENT_ASSIST_TOOLS，否则开发机
+    E:\\租房\\tools（存在时），其余机器回退 ~/.rent-assist/tools。
+    """
+    root = Path(os.environ.get("RENT_ASSIST_TOOLS")
+                or (Path(r"E:\租房\tools") if Path(r"E:\租房\tools").exists()
+                    else Path.home() / ".rent-assist" / "tools"))
+    return root / sub if sub else root
+
+
+def keys_env_path() -> Path:
+    """密钥文件位置：RENT_ASSIST_KEYS > E:\\租房\\config\\keys.env（存在时）>
+    ~/.rent-assist/keys.env。密钥永远在 skill 目录外，不进任何仓库。"""
+    env = os.environ.get("RENT_ASSIST_KEYS")
+    if env:
+        return Path(env)
+    p = Path(r"E:\租房\config\keys.env")
+    return p if p.is_file() else Path.home() / ".rent-assist" / "keys.env"
+
+
+DOUYIN_DATA_DIR = tools_dir(r"MediaCrawler\browser_data\dy_user_data_dir")
+DOUBAN_PROFILE_DIR = tools_dir("douban-profile")
 
 XHS_PROBE_QUERY = "租房"
 XHS_PROBE_TIMEOUT = 150        # 浏览器自动化搜索较慢，放宽
@@ -391,7 +415,7 @@ def probe_douban_http(timeout=15, url=None):
 DOUBAN_HOME_URL = "https://www.douban.com/"
 DOUBAN_LOGIN_WAIT = 180        # 人工登录轮询等待上限（秒）
 DOUBAN_POLL_INTERVAL = 5       # 轮询间隔（秒）
-LOCAL_BROWSERS_PATH = Path(r"E:\租房\tools\playwright-browsers")
+LOCAL_BROWSERS_PATH = tools_dir("playwright-browsers")
 
 
 def ensure_playwright_browsers_path():

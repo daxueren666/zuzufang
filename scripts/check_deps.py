@@ -81,6 +81,10 @@ def print_install_guide(reason):
 
 
 def main():
+    print("[check_deps] 数据目录: %s" % ac.data_dir())
+    print("[check_deps] 工具目录: %s" % ac.tools_dir())
+    kp = ac.keys_env_path()
+    print("[check_deps] 密钥文件: %s%s" % (kp, "" if kp.is_file() else "（缺失，可选：高德/Jina key）"))
     exe = shutil.which("agent-reach")
     if exe is None:
         print_install_guide("未找到命令 agent-reach（可能未安装或不在 PATH 中）")

@@ -78,7 +78,7 @@ NOISE_SOURCES = [
 
 _COORD_RE = re.compile(r"^\d{1,3}\.\d+,\d{1,3}\.\d+$")
 _INFOCODE_MSG = {
-    "10001": r"Key 不存在或无效（检查 E:\租房\config\keys.env 或 ~/.rent-assist/keys.env 的 AMAP_WEB_KEY）",
+    "10001": r"Key 不存在或无效（检查 keys.env 的 AMAP_WEB_KEY；位置优先级 RENT_ASSIST_KEYS > E:\租房\config\keys.env > ~/.rent-assist/keys.env）",
     "10003": "Key 已过期或被禁用",
     "10009": "配额超限（今日个人配额用尽，明天再试或清理 cache.db 复用）",
     "10044": "配额超限（今日请求次数超限）",
@@ -99,7 +99,7 @@ def _keys_env_path() -> Path:
 
     旧位置 SKILL_ROOT/data/keys.env 仅作兼容回退（打印迁移警告）。
     """
-    home_path = Path(r"E:\租房\config\keys.env") if Path(r"E:\租房\config\keys.env").is_file() else (Path.home() / ".rent-assist" / "keys.env")
+    home_path = ac.keys_env_path()  # 统一解析：RENT_ASSIST_KEYS > E:\租房\config\keys.env > ~/.rent-assist/keys.env
     if home_path.is_file():
         return home_path
     legacy = SKILL_ROOT / "data" / "keys.env"

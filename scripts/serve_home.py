@@ -85,7 +85,9 @@ def demo_report_name():
     return newest.name if newest else None
 LANDING = Path(__file__).resolve().parents[1] / "templates" / "landing.html"
 REPORTS_DIR = ac.data_dir("reports")
-WORK_DIR = Path(r"E:\租房")          # claude 在项目目录里跑，权限设置才生效
+WORK_DIR = Path(os.environ.get("RENT_ASSIST_WORK_DIR")
+                or (Path(r"E:\租房") if Path(r"E:\租房").exists() else Path.cwd()))
+# claude 在项目目录里跑，权限设置才生效；他机无 E:\租房 时用启动目录
 
 
 class Handler(BaseHTTPRequestHandler):

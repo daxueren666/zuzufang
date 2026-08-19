@@ -45,7 +45,7 @@ python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 
 - 地图功能需自备高德 key（免费申请，方法见 `references/amap-api.md`；不填则报告自动降级为纯文字版，其余功能不受影响）
 - 部分数据源首次使用需扫码登录一次，之后免扫（排障见 `references/auth.md`）
-- 开发环境为 Windows，换机器遇到路径问题看 SKILL.md「脚本与数据约定」
+- 数据/工具/密钥目录自动解析：环境变量（RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS）可覆盖，默认 `~/.rent-assist/` 下；`check_deps.py` 会打印实际位置。开发环境为 Windows
 
 ## 边界（必读）
 

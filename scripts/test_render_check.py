@@ -17,6 +17,7 @@
 import argparse
 import html as html_mod
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -164,8 +165,10 @@ def cases():
     c["meta"]["time_distribution"] = "近1年 12 条 / 更早 5 条"
     yield "边界全空", mk_ctx(a, c, None)
 
-    # 真实数据（存在才跑）
-    root = Path(r"E:\租房\data")
+    # 真实数据（存在才跑；数据目录解析同 auth_common，但不建目录）
+    root = Path(os.environ.get("RENT_ASSIST_DATA") or r"E:\租房\data")
+    if not root.exists():
+        root = Path.home() / ".rent-assist" / "data"
     ap = root / "analysis" / "天通苑.json"
     cp = root / "cleaned" / "天通苑.json"
     gp = root / "geo" / "天通苑.json"

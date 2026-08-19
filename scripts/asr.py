@@ -17,13 +17,13 @@
       stdout 每个视频一行摘要（字数+耗时）。
 
 运行环境（懒加载，缺了不阻断 import，转写时才报）:
-  - venv: E:\\租房\\tools\\asr-venv（sherpa-onnx + soundfile + numpy，共约 60MB）
-      装法见 INSTALL_HINT；跑本脚本要用该 venv 的 python
-  - 模型: E:\\租房\\tools\\models\\sherpa-onnx-sense-voice-small\\
+  - venv: <tools>/asr-venv（sherpa-onnx + soundfile + numpy，共约 60MB；工具目录
+      解析见 auth_common.tools_dir：开发机 E:\\租房\\tools，其余机器 ~/.rent-assist/tools，
+      RENT_ASSIST_TOOLS 可覆盖）装法见 INSTALL_HINT；跑本脚本要用该 venv 的 python
+  - 模型: <tools>/models/sherpa-onnx-sense-voice-small/
       model_q8.onnx(239MB int8) + tokens.txt + silero-vad/model.onnx
       （env ASR_MODEL_DIR 覆盖模型目录）
-  - ffmpeg: E:\\ffmpeg\\ffmpeg-9.0-essentials_build\\bin\\ffmpeg.exe
-      （env ASR_FFMPEG 覆盖；本机 PATH 无全局 ffmpeg，必须绝对路径）
+  - ffmpeg: env ASR_FFMPEG > 开发机 E:\\ffmpeg\\...\\ffmpeg.exe > PATH 查找
 
 退出码: 0 = 至少成功一个；2 = 无产出（文件/目录不存在、无视频文件、全部失败）；
             3 = 依赖缺失（sherpa-onnx 未安装 / 模型文件不齐 / ffmpeg 不存在）。
@@ -33,6 +33,7 @@ import argparse
 import hashlib
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -44,21 +45,21 @@ import auth_common as ac
 TEXT_MAX = 3000
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".flv", ".webm", ".m4v", ".ts"}
 SAMPLE_RATE = 16000
-DEFAULT_MODEL_DIR = Path(r"E:\租房\tools\models\sherpa-onnx-sense-voice-small")
+DEFAULT_MODEL_DIR = ac.tools_dir("models") / "sherpa-onnx-sense-voice-small"
 DEFAULT_FFMPEG = Path(r"E:\ffmpeg\ffmpeg-9.0-essentials_build\bin\ffmpeg.exe")
-VENV_PY = Path(r"E:\租房\tools\asr-venv\Scripts\python.exe")
+VENV_PY = ac.tools_dir("asr-venv") / "Scripts" / "python.exe"
 # 模型权重候选文件名（ModelScope xiaowangge 包用 model_q8.onnx，
 # sherpa-onnx 官方 release 包用 model.int8.onnx）
 MODEL_FILE_CANDIDATES = ("model_q8.onnx", "model.int8.onnx", "model.onnx")
 FFMPEG_TIMEOUT = 300          # 单视频抽 wav 超时（秒）
 
-INSTALL_HINT = """\
-[asr] 缺少 sherpa-onnx，无法本地转写。安装（全落 E 盘，无 torch，约 60MB）:
-[asr]   python -m venv E:\\租房\\tools\\asr-venv
-[asr]   PIP_CACHE_DIR=E:\\租房\\tools\\pip-cache E:\\租房\\tools\\asr-venv\\Scripts\\python \\
-[asr]     -m pip install sherpa-onnx soundfile numpy \\
-[asr]     --index-url https://pypi.tuna.tsinghua.edu.cn/simple
-[asr] 之后用该 venv 的 python 跑本脚本: E:\\租房\\tools\\asr-venv\\Scripts\\python asr.py --video <mp4>"""
+INSTALL_HINT = (
+    "[asr] 缺少 sherpa-onnx，无法本地转写。安装（无 torch，约 60MB）:\n"
+    "[asr]   python -m venv \"%s\"\n"
+    "[asr]   PIP_CACHE_DIR=\"%s\" \"%s\" -m pip install sherpa-onnx soundfile numpy \\\n"
+    "[asr]     --index-url https://pypi.tuna.tsinghua.edu.cn/simple\n"
+    "[asr] 之后用该 venv 的 python 跑本脚本: \"%s\" asr.py --video <mp4>"
+) % (VENV_PY.parent.parent, ac.tools_dir("pip-cache"), VENV_PY, VENV_PY)
 
 MODEL_HINT = """\
 [asr] 模型文件不齐（目录: %s），缺: %s
@@ -72,8 +73,8 @@ MODEL_HINT = """\
 
 FFMPEG_HINT = """\
 [asr] ffmpeg 不存在: %s
-[asr] 本机在 E:\\ffmpeg\\ffmpeg-9.0-essentials_build\\bin\\ffmpeg.exe，未进 PATH。
-[asr] （env ASR_FFMPEG 可覆盖路径）"""
+[asr] 安装 ffmpeg（进 PATH 即可被自动找到）或设 env ASR_FFMPEG 指向可执行文件。
+[asr] 开发机在 E:\\ffmpeg\\ffmpeg-9.0-essentials_build\\bin\\ffmpeg.exe（未进 PATH）。"""
 
 _TAG_RE = re.compile(r"<\|[^|>]*\|>")   # SenseVoice 输出的 <|zh|><|NEUTRAL|> 等标记
 _WS_RE = re.compile(r"\s+")
@@ -85,8 +86,17 @@ def model_dir():
 
 
 def ffmpeg_exe():
-    """ffmpeg 绝对路径（env ASR_FFMPEG 可覆盖）。"""
-    return Path(os.environ.get("ASR_FFMPEG") or DEFAULT_FFMPEG)
+    """ffmpeg 路径（env ASR_FFMPEG > 开发机 E 盘绝对路径 > PATH 查找；
+    都没有时返回 E 盘默认值供报错提示用）。"""
+    env = os.environ.get("ASR_FFMPEG")
+    if env:
+        return Path(env)
+    if DEFAULT_FFMPEG.exists():
+        return DEFAULT_FFMPEG
+    w = shutil.which("ffmpeg")
+    if w:
+        return Path(w)
+    return DEFAULT_FFMPEG
 
 
 def find_model_file(md):

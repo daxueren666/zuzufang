@@ -64,7 +64,7 @@ apply_time_window = ac.apply_time_window
 window_stat_seg = ac.window_stat_seg
 
 PLATFORM = "douyin"
-DEFAULT_MC_DIR = Path(r"E:\租房\tools\MediaCrawler")
+DEFAULT_MC_DIR = ac.tools_dir("MediaCrawler")  # RENT_ASSIST_TOOLS 可覆盖，默认回退 ~/.rent-assist/tools
 DEFAULT_OUT_DIR = ac.data_dir("raw")  # ~/.rent-assist/data/raw（RENT_ASSIST_DATA 可覆盖）
 CONTENT_MAX = 2000          # content 字段最大字符数
 MC_TIMEOUT = 1800           # MediaCrawler 单次运行超时（首跑含扫码登录，放宽到 30 分钟）
@@ -73,7 +73,7 @@ PER_POST_COMMENT_FETCH = 3  # MediaCrawler 每帖实际抓取评论数 = top_com
 
 # ---- 视频下载 + 口播转写（--get-video，sherpa-onnx 管线详见 asr.py） ----
 GET_VIDEO_MAX = 3           # --get-video 上限（每视频几十 MB，控制下载量）
-ASR_VENV_PY = Path(r"E:\租房\tools\asr-venv\Scripts\python.exe")
+ASR_VENV_PY = ac.tools_dir("asr-venv") / "Scripts" / "python.exe"
 ASR_SCRIPT = Path(__file__).resolve().parent / "asr.py"
 ASR_TIMEOUT = 900           # 单视频转写超时（含模型加载，int8 CPU）
 SPOKEN_PREFIX = "【口播转写】"

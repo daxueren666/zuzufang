@@ -67,7 +67,7 @@ MCPORTER_TIMEOUT = 120
 HTTP_TIMEOUT = 30
 DIRECT_TIMEOUT = 15           # Jina 失败后直连兜底的超时（秒）
 UA = "Mozilla/5.0 (compatible; rent-assist-collector/1.0)"
-KEYS_ENV_PATH = Path(r"E:\租房\config\keys.env")  # 密钥文件（KEY=VALUE 纯文本）
+KEYS_ENV_PATH = ac.keys_env_path()  # 密钥文件（RENT_ASSIST_KEYS 可覆盖，默认回退 ~/.rent-assist/keys.env）
 JINA_RETRY_BACKOFF = (2, 4, 8)  # Jina 限流(429/503)指数退避秒数，共重试 3 次
 
 # 正文记录 extra.source 取值（extra.content_source 统一用 jina/direct/summary_only）
@@ -383,7 +383,7 @@ _JINA_KEY_LOADED = False
 
 
 def load_jina_key():
-    """读 JINA_API_KEY：环境变量优先，否则 E:\\租房\\config\\keys.env；
+    """读 JINA_API_KEY：环境变量优先，否则 keys_env_path() 解析的密钥文件；
     都没有返回 ""（无 key 模式，行为与未加固前完全一致）。结果缓存只读一次。
     """
     global _JINA_KEY, _JINA_KEY_LOADED

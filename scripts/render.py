@@ -121,7 +121,7 @@ def load_jsapi_keys() -> dict:
     """
     out = {"jsapi_key": (os.environ.get("AMAP_JSAPI_KEY") or "").strip(),
            "jsapi_secret": (os.environ.get("AMAP_JSAPI_SECRET") or "").strip()}
-    env_path = Path(r"E:\租房\config\keys.env") if Path(r"E:\租房\config\keys.env").is_file() else (Path.home() / ".rent-assist" / "keys.env")
+    env_path = ac.keys_env_path()  # 统一解析：RENT_ASSIST_KEYS > E:\租房\config\keys.env > ~/.rent-assist/keys.env
     if not env_path.is_file():
         legacy = SKILL_ROOT / "data" / "keys.env"
         if legacy.is_file():
