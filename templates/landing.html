@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>呼叫租租房</title>
+<script>
+/* 初始按本地时间定昼夜（18:00-6:00 夜），首帧前生效避免闪色 */
+(function(){try{var h=new Date().getHours();if(h>=18||h<6)document.documentElement.classList.add('night');}catch(e){}})();
+</script>
+<style>
+  :root{
+    --accent:#1f5fbf; --accent-deep:#1a4f9e;
+    --fg:#1c2733; --fg2:#5b6b7d; --fgclock:#96a5b8;
+    --pill:#1c2733; --focus:#1f5fbf; --ring:rgba(31,95,191,.30);
+    --cbbr:#c9d9ec; --cbbg:#ffffff;
+    --r-card:16px; --r-ctl:12px;
+    --shadow-p:0 10px 30px rgba(31,95,191,.16);
+    --shadow-g:0 8px 24px rgba(31,95,191,.38);
+  }
+  .night{
+    --fg:#f2f6ff; --fg2:#a9bad8; --fgclock:#8fa0c0;
+    --pill:#243350; --focus:#8fb6ff; --ring:rgba(143,182,255,.32);
+    --cbbr:rgba(255,255,255,.16); --cbbg:rgba(255,255,255,.06);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+  body{
+    margin:0;color:var(--fg);transition:color 1.2s ease;
+    font-family:system-ui,-apple-system,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+    font-size:15px;line-height:1.7;overflow-x:hidden;
+  }
+  button,input{font:inherit}
+
+  /* ---------- 舞台与天空 ---------- */
+  .stage{position:relative;min-height:100dvh;overflow:hidden}
+  .sky{position:absolute;inset:0;pointer-events:none}
+  .sky-day{background:linear-gradient(180deg,#d7eafa 0%,#e9f2fc 55%,#f4f8fe 100%)}
+  .sky-night{background:linear-gradient(180deg,#0a1224 0%,#0f1b33 52%,#1a2c52 100%);
+    opacity:0;transition:opacity 1.05s cubic-bezier(.45,.05,.3,1)}
+  .night .sky-night{opacity:1}
+  html.fast .sky-night{transition-duration:.45s}
+  /* 黄昏/黎明过渡层：切换先经暖橙霞，再落到目标态（夜转昼用 dawn 浅一档） */
+  .sky-dusk{background:linear-gradient(180deg,#ee8e5f 0%,#d3748f 46%,#8a64ac 100%);
+    opacity:0;transition:opacity .85s cubic-bezier(.45,.05,.3,1)}
+  html.dusk .sky-dusk{opacity:1;transition-duration:.85s}
+  html.dusk.fast .sky-dusk{transition-duration:.5s}
+  html.duskout.fast .sky-dusk{transition-duration:.55s}
+  html.dusk.dawn .sky-dusk{background:linear-gradient(180deg,#f6bd8d 0%,#e79ea7 46%,#a98dc7 100%)}
+
+  /* ---------- 屏：首页 / 等待 ---------- */
+  .screen{position:relative;z-index:2;pointer-events:none}
+  .screen :is(input,button,a,form,label,.copybox){pointer-events:auto}
+
+  .home{min-height:100dvh;display:flex;flex-direction:column;
+    padding:0 22px calc(72vw + 38px);
+    opacity:1;transition:opacity .45s ease}
+  .stage.onwait .home{opacity:0;visibility:hidden;transition:opacity .45s ease,visibility 0s linear .45s}
+
+  .clock{position:absolute;top:max(16px,env(safe-area-inset-top,0px));left:22px;
+    font-size:13.5px;font-weight:500;letter-spacing:.06em;color:var(--fgclock);
+    font-variant-numeric:tabular-nums;transition:color 1.2s ease}
+
+  .home-inner{margin:auto 0;max-width:600px}
+  .hero-title{margin:0;font-size:clamp(42px,11vw,54px);font-weight:800;
+    line-height:1.14;letter-spacing:.015em;color:var(--fg);transition:color 1.2s ease}
+  .hero-sub{margin:14px 0 0;font-size:16px;color:var(--fg2);letter-spacing:.03em;
+    transition:color 1.2s ease}
+
+  /* 入场（克制的小淡入） */
+  .hero-title{animation:enter .6s cubic-bezier(.3,.7,.3,1) both;animation-delay:calc(var(--e,0)*90ms)}
+  .hero-sub{animation:enter .6s .08s cubic-bezier(.3,.7,.3,1) both}
+  .askrow{animation:enter .6s .16s cubic-bezier(.3,.7,.3,1) both}
+  @keyframes enter{from{opacity:0;transform:translateY(14px)}to{opacity:1}}
+
+  /* 输入组：墨色胶囊 + 圆形箭头钮 */
+  .askrow{display:flex;align-items:center;gap:10px;max-width:560px;margin-top:28px}
+  .pill{display:flex;align-items:center;gap:10px;flex:1;min-width:0;height:54px;
+    background:var(--pill);border-radius:999px;padding:0 10px 0 18px;
+    box-shadow:var(--shadow-p);cursor:text;
+    transition:background 1.2s ease,box-shadow .25s ease}
+  .pill:focus-within{box-shadow:var(--shadow-p)}   /* 点击输入不加蓝框，保持原样 */
+  .pill input{flex:1;min-width:0;border:0;outline:none;background:transparent;
+    color:#fff;font-size:16px;line-height:1.4}
+  .pill input::placeholder{color:rgba(255,255,255,.5)}
+  .dot{width:8px;height:8px;border-radius:50%;background:#8b97ab;flex:none;
+    transition:background .3s ease,box-shadow .3s ease}
+  .dot.on{background:#35c37f;box-shadow:0 0 7px rgba(53,195,127,.85)}
+  .go{width:54px;height:54px;border-radius:50%;border:0;flex:none;
+    background:var(--accent);color:#fff;display:grid;place-items:center;cursor:pointer;
+    box-shadow:var(--shadow-g);
+    transition:transform .15s ease,background .2s ease,opacity .2s ease}
+  .go:hover{background:var(--accent-deep);transform:scale(1.06)}
+  .go:active{transform:scale(.92)}
+  .go[disabled]{opacity:.65;cursor:default;transform:none}
+  .goflash{font-size:13px;font-weight:600;letter-spacing:.02em}
+  :is(.go,.daynight,.w-back,.w-open):focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+  .pill input:focus-visible{outline:none}   /* 手机点输入框不出现蓝框 */
+  html{-webkit-tap-highlight-color:transparent}
+
+  .hintline{margin:11px 2px 0;min-height:19px;font-size:12.5px;color:var(--fg2);
+    transition:color 1.2s ease}
+  .replink{display:inline-block;margin:12px 2px 0;font-size:12.5px;color:var(--fg2);
+    text-decoration:underline;text-decoration-color:transparent;text-underline-offset:4px;
+    transition:color .2s ease,text-decoration-color .2s ease}
+  .replink:hover{color:var(--accent);text-decoration-color:currentColor}
+  .replink[hidden]{display:none}
+  .copybox{margin-top:10px;max-width:560px;border:1px solid var(--cbbr);background:var(--cbbg);
+    border-radius:var(--r-ctl);padding:10px 12px;font-size:12.5px;color:var(--fg2)}
+  .copybox .ct{user-select:all;cursor:pointer;word-break:break-all;line-height:1.65;color:var(--fg)}
+  .copybox .ctip{margin-top:6px;opacity:.85}
+
+  /* ---------- 等待屏 ---------- */
+  .waiting{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;
+    visibility:hidden;opacity:0;transition:opacity .5s ease,visibility 0s linear .5s}
+  .stage.onwait .waiting{visibility:visible;opacity:1;transition:opacity .5s ease .12s}
+  .w-scrim{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(60% 46% at 50% 44%,rgba(7,13,28,.55),rgba(7,13,28,0) 72%)}
+  .w-inner{position:relative;display:flex;flex-direction:column;align-items:center;
+    text-align:center;padding:0 24px;max-width:640px}
+  .w-top{display:flex;flex-direction:column;align-items:center}
+  .w-timer{font-size:clamp(30px,4.6vw,44px);font-weight:700;color:#f2f6ff;
+    letter-spacing:.02em;font-variant-numeric:tabular-nums}
+  .w-phase{margin-top:14px;font-size:17px;color:#c9d8f2;min-height:28px;
+    transition:opacity .42s ease}
+  .w-phase.out{opacity:0}
+  .w-note{margin:8px 0 0;font-size:13px;color:#8fa0c4}
+  .waiting.ready .w-top{display:none}
+  .w-ready{display:flex;flex-direction:column;align-items:center;gap:14px}
+  .w-ready[hidden]{display:none}
+  .w-done{margin:0;font-size:clamp(26px,4vw,36px);font-weight:800;color:#ffd166;letter-spacing:.02em}
+  .w-open{display:inline-flex;align-items:center;text-decoration:none;color:#fff;
+    background:var(--accent);font-weight:600;font-size:16px;padding:13px 36px;border-radius:999px;
+    box-shadow:var(--shadow-g);transition:transform .15s ease,background .2s ease}
+  .w-open:hover{background:var(--accent-deep);transform:scale(1.03)}
+  .w-open-note{margin:0;font-size:12.5px;color:#8fa0c4}
+  .w-back{margin-top:30px;background:none;border:0;cursor:pointer;color:#9fb2d6;
+    font-size:14.5px;padding:12px 18px;border-radius:var(--r-ctl);transition:color .2s ease}
+  .w-back:hover{color:#e6eeff;text-decoration:underline;text-underline-offset:4px}
+
+  /* ---------- 昼夜切换小圆钮 ---------- */
+  .daynight{position:absolute;z-index:3;top:max(14px,env(safe-area-inset-top,0px));
+    right:clamp(16px,3.4vw,42px);width:44px;height:44px;border-radius:50%;
+    border:1px solid var(--cbbr);background:transparent;cursor:pointer;
+    display:grid;place-items:center;transition:border-color 1.2s ease,opacity .4s ease}
+  .stage.onwait .daynight{opacity:0;visibility:hidden;transition:opacity .4s ease,visibility 0s .4s}
+  .daynight .ic{grid-area:1/1;width:22px;height:22px;color:var(--fg2);
+    transition:opacity .9s ease,color 1.2s ease}
+  .ic-moon{opacity:0}
+  .night .ic-sun{opacity:0}
+  .night .ic-moon{opacity:1}
+
+  /* ---------- 楼群场景（两屏共用一个 SVG） ---------- */
+  .scene{position:absolute;left:50%;bottom:0;z-index:1;width:100%;
+    transform:translateX(-50%);transform-origin:50% 100%;cursor:pointer;
+    transition:transform 1.05s cubic-bezier(.25,.8,.3,1)}
+  .scene svg{display:block;width:100%;height:auto;overflow:hidden}
+  .scene{animation:sceneIn .9s ease both}
+  @keyframes sceneIn{from{opacity:0}to{opacity:1}}
+
+  /* 天体与星云（日先沉、月后升的错峰：靠 transition-delay） */
+  .sun{opacity:1;transition:opacity .8s ease .22s}
+  .night .sun{opacity:0}
+  .sunrays{transform-box:fill-box;transform-origin:center;animation:spin 90s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .moon{opacity:0;transition:opacity .8s ease .45s}
+  .night .moon{opacity:1}
+  .dusk .sun{opacity:.14}   /* 落霞期太阳先沉，黎明微透 */
+  .st{fill:#dfe8ff;opacity:0;transition:opacity 1.1s ease}
+  .night .st{opacity:.9;animation:tw 3.8s ease-in-out infinite alternate;animation-delay:var(--d,0s)}
+  @keyframes tw{from{opacity:.35}to{opacity:.95}}
+  .cl{opacity:.92;transition:opacity 1.1s ease}
+  .night .cl{opacity:0}
+  .cl1{animation:drift 30s ease-in-out infinite alternate}
+  .cl2{animation:drift 38s ease-in-out infinite alternate-reverse}
+  @keyframes drift{from{transform:translateX(-26px)}to{transform:translateX(46px)}}
+
+  /* 楼体昼夜 */
+  .bk{transition:fill 1.2s ease}
+  .b-far{fill:#e7eff9}   .night .b-far{fill:#111f3e}
+  .b-far2{fill:#dce9f9}  .night .b-far2{fill:#142347}
+  .b-m1{fill:#d3e3f7}    .night .b-m1{fill:#17294e}
+  .b-m2{fill:#c6dbf1}    .night .b-m2{fill:#1b2f58}
+  .b-m3{fill:#d9e8f9}    .night .b-m3{fill:#152648}
+  .b-n1{fill:#e9f0f9}    .night .b-n1{fill:#1e3560}
+  .b-n2{fill:#dfeaf7}    .night .b-n2{fill:#1c3158}
+  .b-hero{fill:#1f5fbf}  .night .b-hero{fill:#142344}
+
+  /* 窗：白天玻璃色，入夜逐扇错峰点亮 */
+  .w{fill:#c9dcf2;transition:fill .5s ease;transition-delay:calc(var(--i,0)*90ms)}
+  .wH{fill:#a9cdf4}
+  .night .w,.night .wH{fill:#25396b}
+  .night .w.lit{fill:#ffd166}
+
+  /* 天线与雷达波纹 */
+  .ant{stroke:#9db4cf;stroke-width:3;stroke-linecap:round;transition:stroke 1.2s ease}
+  .night .ant{stroke:#3a5b94}
+  .av{fill:#9db4cf;transition:fill 1.2s ease}
+  .night .av{fill:#ff6b6b;animation:avblink 2.4s ease-in-out infinite}
+  @keyframes avblink{0%,100%{opacity:1}50%{opacity:.35}}
+  .rr{fill:none;stroke:#8fb6ff;stroke-width:2;vector-effect:non-scaling-stroke;opacity:0;
+    transform-box:fill-box;transform-origin:center}
+  .stage.burst .rr1{animation:rrOnce .62s ease-out forwards}
+  .stage.burst .rr2{animation:rrOnce .62s .16s ease-out forwards}
+  @keyframes rrOnce{0%{opacity:.85;transform:scale(.3)}100%{opacity:0;transform:scale(4.6)}}
+  .stage.loop .rr1{animation:rrLoop 2.4s cubic-bezier(.2,.55,.4,1) infinite}
+  .stage.loop .rr2{animation:rrLoop 2.4s 1.2s cubic-bezier(.2,.55,.4,1) infinite}
+  @keyframes rrLoop{0%{opacity:.8;transform:scale(.25)}70%{opacity:.3}100%{opacity:0;transform:scale(4.2)}}
+
+  /* 街道、路灯、车 */
+  .walk{fill:#d8e5f2;transition:fill 1.2s ease}   .night .walk{fill:#152648}
+  .road{fill:#c6d5e6;transition:fill 1.2s ease}   .night .road{fill:#0b1526}
+  .dash{stroke:#f0f6fd;stroke-width:3;stroke-dasharray:20 16;opacity:.85;transition:stroke 1.2s ease,opacity 1.2s ease}
+  .night .dash{stroke:#2e4370;opacity:.9}
+  .pole{fill:#93aac6;transition:fill 1.2s ease}   .night .pole{fill:#2a4070}
+  .lhead{fill:#93aac6;transition:fill 1.2s ease}  .night .lhead{fill:#ffd166}
+  .halo{fill:#ffd166;opacity:0;transition:opacity 1.1s ease}
+  .night .halo{opacity:.24}
+
+  .car .body{transition:fill 1.2s ease}
+  .ca .body{fill:#1f5fbf}   .night .ca .body{fill:#2b4d85}
+  .cb .body{fill:#f4f8fd}   .night .cb .body{fill:#b9c8e2}
+  .cc .body{fill:#2c3f63}   .night .cc .body{fill:#22334f}
+  .car .body{stroke:none}
+  .cb .body{stroke:#c3d4e8;stroke-width:1}
+  .wheel{fill:#16233c;transition:fill 1.2s ease}  .night .wheel{fill:#0e1930}
+  .hlgt,.tlgt,.beam{opacity:0;transition:opacity 1s ease}
+  .night .hlgt{opacity:1;fill:#fff3c9}
+  .night .tlgt{opacity:.95;fill:#ff7a6b}
+  .night .beam{opacity:.42;fill:#ffe9ad}
+
+  /* 右侧通行：近车道（下，y497）向左，远车道（上，y478）向右 */
+  .ca{transform:translate(120px,497px) scaleX(-1);animation:drvL 7.5s linear infinite}
+  .cb{transform:translate(520px,478px);animation:drvR 11s linear infinite}
+  .cc{transform:translate(320px,497px) scaleX(-1) scale(.85);animation:drvLs 5.4s linear infinite;animation-delay:-2.7s}
+  @keyframes drvR{from{transform:translate(-110px,478px)}to{transform:translate(830px,478px)}}
+  @keyframes drvL{from{transform:translate(830px,497px) scaleX(-1)}to{transform:translate(-110px,497px) scaleX(-1)}}
+  @keyframes drvLs{from{transform:translate(830px,497px) scale(.85) scaleX(-1)}to{transform:translate(-110px,497px) scale(.85) scaleX(-1)}}
+
+  /* ---------- 新元素：外卖电动车 / 晾衣绳 / 电视机窗 / 流星 ---------- */
+  /* 外卖电动车：人行道上沿向右（与远车道同向），约 9s 一趟 */
+  .ebike{transform:translate(430px,469px);animation:ebikeR 9s linear infinite;animation-delay:-4.2s}
+  @keyframes ebikeR{from{transform:translate(-70px,469px)}to{transform:translate(790px,469px)}}
+  .ewheel{fill:#16233c;transition:fill 1.2s ease}   .night .ewheel{fill:#0e1930}
+  .eframe{fill:#5b6b7d;stroke:#5b6b7d;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;
+    transition:fill 1.2s ease,stroke 1.2s ease}
+  .night .eframe{fill:#2a4070;stroke:#2a4070}
+  .erider{fill:#2c3f63;transition:fill 1.2s ease}   .night .erider{fill:#22334f}
+  .ehelm{fill:#1f5fbf;transition:fill 1.2s ease}    .night .ehelm{fill:#2b4d85}
+  .ebox{fill:#ffd166}
+  .emark{fill:#1f5fbf;transition:fill 1.2s ease}    .night .emark{fill:#2b4d85}
+  .elamp,.ebeam{opacity:0;transition:opacity 1s ease}
+  .night .elamp{opacity:1;fill:#fff3c9}
+  .night .ebeam{opacity:.38;fill:#ffe9ad}
+
+  /* 晾衣绳：微垂曲线，衣服各以挂点为原点慢摆 */
+  .cline{fill:none;stroke:#9db4cf;stroke-width:1.2;transition:stroke 1.2s ease}
+  .night .cline{stroke:#3a5b94}
+  .cm{transition:fill 1.2s ease}
+  .cm-a{fill:#cddcee}  .night .cm-a{fill:#31405e}
+  .cm-b{fill:#e7dccd}  .night .cm-b{fill:#494258}
+  .cm-c{fill:#c8dcd2}  .night .cm-c{fill:#2e4152}
+  .cm-d{fill:#d9d5e2}  .night .cm-d{fill:#3c3a52}
+  .cloth{transform-box:fill-box;transform-origin:50% 0;
+    animation:swing var(--sd,4s) ease-in-out infinite alternate;animation-delay:var(--dl,0s)}
+  @keyframes swing{from{transform:rotate(-3.5deg)}to{transform:rotate(3.5deg)}}
+
+  /* 电视机窗：夜闪蓝光，白天普通暗窗 */
+  .tvbase{fill:#a9c2df;transition:fill 1.2s ease}   .night .tvbase{fill:#25396b}
+  .tvglow{fill:#4a72c4;opacity:0}
+  .tvwhite{fill:#dfe9ff;opacity:0}
+  .night .tvglow{animation:tvg 2.7s linear infinite}
+  .night .tvwhite{animation:tvw 2.7s linear infinite}
+  @keyframes tvg{0%{opacity:.18}6%{opacity:.6}11%{opacity:.28}19%{opacity:.72}26%{opacity:.5}
+    38%{opacity:.9}49%{opacity:.22}58%{opacity:.68}72%{opacity:.38}84%{opacity:.85}93%{opacity:.45}100%{opacity:.18}}
+  @keyframes tvw{0%,14%{opacity:0}18%{opacity:.55}24%{opacity:0}44%,50%{opacity:0}54%{opacity:.4}
+    60%{opacity:0}80%,86%{opacity:0}90%{opacity:.65}96%{opacity:0}100%{opacity:0}}
+
+  /* 流星：仅夜，JS 随机触发，1s 划过 */
+  .meteor .mcore{opacity:0}
+  .night .meteor.run .mcore{animation:shoot 1s cubic-bezier(.25,.6,.45,1) forwards}
+  @keyframes shoot{0%{opacity:0;transform:translate(0,0)}12%{opacity:1}
+    100%{opacity:0;transform:translate(-175px,98px)}}
+
+  /* ---------- 提交转场三拍 ---------- */
+  .stage.t1 :is(.askrow,.hintline,.copybox){animation:collOut .4s cubic-bezier(.4,0,.7,.2) forwards}
+  @keyframes collOut{to{opacity:0;transform:translateY(12px) scale(.95);visibility:hidden}}
+  .stage.t2 .hero-title{animation:riseOut .55s cubic-bezier(.33,.7,.3,1) forwards}
+  .stage.t2 .hero-sub{animation:riseOut .55s .07s cubic-bezier(.33,.7,.3,1) forwards}
+  @keyframes riseOut{to{opacity:0;transform:translateY(-36px)}}
+
+  /* ---------- 桌面：文字左对齐，场景右下背景式（高度约54dvh，最高楼探入上半区） ---------- */
+  @media (min-width:1024px){
+    .home{padding:0 48px 0 clamp(34px,8vw,128px)}
+    .home-inner{margin:auto 0;transform:translateY(-6%);max-width:560px}
+    .hero-title{font-size:clamp(56px,5.4vw,74px)}
+    .hero-sub{font-size:17px}
+    .clock{left:clamp(34px,8vw,128px)}
+    .scene{width:min(58vw,74.8dvh);       /* 高度 = 宽*0.7222 ≤ 54dvh */
+      transform:translateX(calc(47vw - min(58vw, 74.8dvh)))}   /* 左缘本在50vw处，右移47vw再退自身宽，右缘贴 3vw 边距 */
+  }
+  /* 转场/等待时：场景放大居中上升（覆盖上面的右置） */
+  .stage.zoom .scene{transform:translateX(-50%) scale(1.18) translateY(-3.5%)}
+
+  /* ---------- 动画弱化 ---------- */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none !important;transition:none !important}
+    .home,.waiting{transition:opacity .3s ease !important}
+    .stage.onwait .home{transition:opacity .3s ease,visibility 0s linear .3s !important}
+    .waiting{transition:opacity .3s ease,visibility 0s linear .3s !important}
+    .stage.onwait .waiting{transition:opacity .3s ease !important}
+    .st{opacity:.8}
+    .night .av{opacity:1}
+    .night .tvglow{opacity:.5}   /* 电视窗定格在亮帧 */
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="sky sky-day" aria-hidden="true"></div>
+  <div class="sky sky-night" aria-hidden="true"></div>
+  <div class="sky sky-dusk" aria-hidden="true"></div>
+
+  <!-- 屏A 首页 -->
+  <section class="screen home" id="home">
+    <div class="clock" id="clock" aria-hidden="true">--:--</div>
+    <div class="home-inner">
+      <h1 class="hero-title" style="--e:0">呼叫租租房</h1>
+      <p class="hero-sub">大学人出品租房skill</p>
+      <form class="askrow" id="askForm" autocomplete="off" novalidate>
+        <label class="pill">
+          <span class="dot" id="dot" hidden aria-hidden="true"></span>
+          <input id="need" type="text" maxlength="300" placeholder="输入你的租房问题…"
+                 autocomplete="off" enterkeyhint="send" aria-label="输入你的租房问题">
+        </label>
+        <button class="go" id="go" type="submit" aria-label="发送">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <path d="M4.5 12h13.6" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+            <path d="M13 5.8 19.2 12 13 18.2" stroke="#fff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </form>
+      <p class="hintline" id="hintline" role="status"></p>
+      <a class="replink" id="replink" href="/reports/">历史报告</a>
+      <div class="copybox" id="copybox" hidden></div>
+    </div>
+  </section>
+
+  <!-- 屏B 等待页 -->
+  <section class="screen waiting" id="waiting">
+    <div class="w-scrim" aria-hidden="true"></div>
+    <div class="w-inner">
+      <div class="w-top">
+        <div class="w-timer">已等待 <span id="wClock">00:00</span></div>
+        <div class="w-phase" id="wPhase" aria-live="polite">正在理解你的需求</div>
+        <p class="w-note">全程约 20-60 分钟，取决于量级</p>
+      </div>
+      <div class="w-ready" id="wReady" hidden>
+        <p class="w-done">报告已生成</p>
+        <a class="w-open" id="wOpen" href="#" target="_blank" rel="noopener">打开报告</a>
+        <p class="w-open-note" id="wOpenNote" hidden>若新窗口没有弹出，请点上面按钮打开</p>
+      </div>
+      <button class="w-back" id="wBack" type="button">返回</button>
+    </div>
+  </section>
+
+  <!-- 昼夜切换小圆钮 -->
+  <button class="daynight" id="dn" type="button" aria-label="切换白天和夜晚" aria-pressed="false">
+    <svg class="ic ic-sun" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="4.3" fill="currentColor"/>
+      <g stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <line x1="12" y1="2.6" x2="12" y2="5.3"/><line x1="12" y1="18.7" x2="12" y2="21.4"/>
+        <line x1="2.6" y1="12" x2="5.3" y2="12"/><line x1="18.7" y1="12" x2="21.4" y2="12"/>
+        <line x1="5.4" y1="5.4" x2="7.3" y2="7.3"/><line x1="16.7" y1="16.7" x2="18.6" y2="18.6"/>
+        <line x1="16.7" y1="7.3" x2="18.6" y2="5.4"/><line x1="5.4" y1="18.6" x2="7.3" y2="16.7"/>
+      </g>
+    </svg>
+    <svg class="ic ic-moon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M20.4 13.4A8.6 8.6 0 0 1 10.6 3.6a8.6 8.6 0 1 0 9.8 9.8z" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <!-- 楼群场景：首页右下背景式，等待页夜晚为底 -->
+  <div class="scene" id="scene" aria-hidden="true">
+    <svg viewBox="0 0 720 520" xmlns="http://www.w3.org/2000/svg" focusable="false">
+      <!-- 星（夜） -->
+      <g>
+        <circle class="st" cx="28"  cy="52"  r="1.5" style="--d:-0.4s"/>
+        <circle class="st" cx="58"  cy="128" r="1.1" style="--d:-1.8s"/>
+        <circle class="st" cx="120" cy="36"  r="1.3" style="--d:-2.6s"/>
+        <circle class="st" cx="236" cy="84"  r="1.6" style="--d:-0.9s"/>
+        <circle class="st" cx="262" cy="148" r="1"   style="--d:-2.1s"/>
+        <circle class="st" cx="352" cy="30"  r="1.2" style="--d:-1.4s"/>
+        <circle class="st" cx="416" cy="58"  r="1.1" style="--d:-3s"/>
+        <circle class="st" cx="476" cy="116" r="1.4" style="--d:-0.6s"/>
+        <circle class="st" cx="556" cy="66"  r="1.1" style="--d:-2.4s"/>
+        <circle class="st" cx="586" cy="142" r="1.5" style="--d:-1.2s"/>
+        <circle class="st" cx="654" cy="40"  r="1.3" style="--d:-2.8s"/>
+        <circle class="st" cx="700" cy="96"  r="1.2" style="--d:-1.6s"/>
+      </g>
+      <!-- 月（夜） -->
+      <g class="moon">
+        <circle cx="150" cy="84" r="30" fill="#dfe8ff" opacity=".14"/>
+        <circle cx="150" cy="84" r="19" fill="#eef1fb"/>
+        <circle cx="143" cy="78" r="3.4" fill="#d5dbee"/>
+        <circle cx="156" cy="90" r="2.4" fill="#d5dbee"/>
+        <circle cx="152" cy="72" r="1.8" fill="#dde2f4"/>
+      </g>
+      <!-- 日（昼） -->
+      <g class="sun">
+        <g class="sunrays" stroke="#f6c760" stroke-width="2.6" stroke-linecap="round">
+          <line x1="588" y1="59"  x2="588" y2="52"/>
+          <line x1="588" y1="113" x2="588" y2="120"/>
+          <line x1="615" y1="86"  x2="622" y2="86"/>
+          <line x1="561" y1="86"  x2="554" y2="86"/>
+          <line x1="607" y1="67"  x2="612" y2="62"/>
+          <line x1="569" y1="67"  x2="564" y2="62"/>
+          <line x1="607" y1="105" x2="612" y2="110"/>
+          <line x1="569" y1="105" x2="564" y2="110"/>
+        </g>
+        <circle cx="588" cy="86" r="21" fill="#f6c760"/>
+      </g>
+      <!-- 云（昼） -->
+      <g class="cl cl1" fill="#ffffff">
+        <rect x="210" y="120" width="52" height="13" rx="6.5"/>
+        <rect x="224" y="112" width="26" height="11" rx="5.5"/>
+      </g>
+      <g class="cl cl2" fill="#ffffff">
+        <rect x="470" y="64" width="44" height="11" rx="5.5"/>
+        <rect x="482" y="57" width="20" height="9" rx="4.5"/>
+      </g>
+      <!-- 流星（仅夜，JS 随机触发；头亮点+短尾迹，右上向左下） -->
+      <g id="meteor" class="meteor" transform="translate(520,54)">
+        <g class="mcore">
+          <line x1="30" y1="-17" x2="0" y2="0" stroke="#dfe8ff" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          <circle r="1.7" fill="#ffffff"/>
+        </g>
+      </g>
+      <!-- 远景楼 -->
+      <rect class="bk b-far"  x="6"   y="212" width="66" height="258" rx="7"/>
+      <rect class="bk b-far2" x="80"  y="164" width="60" height="306" rx="7"/>
+      <rect class="bk b-far"  x="536" y="238" width="62" height="232" rx="7"/>
+      <rect class="bk b-far2" x="606" y="192" width="72" height="278" rx="7"/>
+      <!-- 中景楼（主楼最高） -->
+      <rect class="bk b-m1"   x="156" y="118" width="74" height="352" rx="8"/>
+      <rect class="bk b-hero" x="298" y="46"  width="88" height="424" rx="9"/>
+      <rect class="bk b-m2"   x="404" y="98"  width="66" height="372" rx="8"/>
+      <rect class="bk b-m3"   x="488" y="168" width="62" height="302" rx="8"/>
+      <rect class="bk b-m2"   x="418" y="90"  width="38" height="12" rx="3" opacity=".9"/>
+      <!-- 近景楼 -->
+      <rect class="bk b-n1" x="232" y="262" width="64" height="208" rx="9"/>
+      <rect class="bk b-n1" x="246" y="254" width="34" height="12" rx="3" opacity=".9"/>
+      <rect class="bk b-n2" x="640" y="302" width="68" height="168" rx="9"/>
+      <!-- 窗（JS 按楼生成，错峰点亮） -->
+      <g id="wins"></g>
+      <!-- 晾衣绳（左邻楼与主楼之间，中上部微垂，衣服各自慢摆） -->
+      <g class="laundry">
+        <path class="cline" d="M230,178 Q264,198 298,182"/>
+        <g transform="translate(244,185)"><g class="cloth" style="--sd:4.3s;--dl:-1.2s">
+          <path class="cm cm-a" d="M-4.5,1 h9 v4 l2.5,1.6 v2.4 l-2.5,.4 v5.6 h-9 v-5.6 l-2.5,-.4 v-2.4 l2.5,-1.6 z"/>
+        </g></g>
+        <g transform="translate(259,188)"><g class="cloth" style="--sd:3.4s;--dl:-.5s">
+          <path class="cm cm-b" d="M-3.2,1 h6.4 v10 h-2.7 l-.5,-4.6 -.5,4.6 h-2.7 z"/>
+        </g></g>
+        <g transform="translate(272,189)"><g class="cloth" style="--sd:5s;--dl:-2.1s">
+          <rect class="cm cm-c" x="-4" y="1" width="8" height="9.5" rx="1.6"/>
+        </g></g>
+        <g transform="translate(287,186)"><g class="cloth" style="--sd:3.8s;--dl:-1.7s">
+          <path class="cm cm-d" d="M-4,1 h8 v4 l2.2,1.4 v2.2 l-2.2,.4 v5 h-8 v-5 l-2.2,-.4 v-2.2 l2.2,-1.4 z"/>
+        </g></g>
+      </g>
+      <!-- 电视机窗（夜里蓝光闪烁的单独窗） -->
+      <g class="tvwin">
+        <rect class="tvbase" x="334" y="250" width="15" height="12" rx="1.6"/>
+        <rect class="tvglow" x="334" y="250" width="15" height="12" rx="1.6"/>
+        <rect class="tvwhite" x="337" y="253" width="9" height="6" rx="1"/>
+      </g>
+      <!-- 主楼天线 -->
+      <g class="antenna">
+        <line class="ant" x1="342" y1="46" x2="342" y2="18"/>
+        <circle class="av" cx="342" cy="16" r="3"/>
+      </g>
+      <!-- 街道 -->
+      <rect class="walk" x="0" y="470" width="720" height="9"/>
+      <rect class="road" x="0" y="479" width="720" height="41"/>
+      <line class="dash" x1="0" y1="499" x2="720" y2="499"/>
+      <!-- 车（双向车道，速度不同；夜开大灯） -->
+      <g class="car cb">
+        <polygon class="beam" points="46,2 70,-3 70,12 46,8"/>
+        <rect class="body" x="0" y="0" width="46" height="13" rx="6.5"/>
+        <path class="body" d="M11,0 q4,-9 12,-9 h10 q8,0 12,9 z"/>
+        <circle class="hlgt" cx="44.5" cy="4.5" r="2.4"/>
+        <circle class="tlgt" cx="2.5" cy="5" r="2"/>
+        <circle class="wheel" cx="12" cy="13.5" r="4.2"/>
+        <circle class="wheel" cx="34" cy="13.5" r="4.2"/>
+      </g>
+      <g class="car ca">
+        <polygon class="beam" points="46,2 70,-3 70,12 46,8"/>
+        <rect class="body" x="0" y="0" width="46" height="13" rx="6.5"/>
+        <path class="body" d="M11,0 q4,-9 12,-9 h10 q8,0 12,9 z"/>
+        <circle class="hlgt" cx="44.5" cy="4.5" r="2.4"/>
+        <circle class="tlgt" cx="2.5" cy="5" r="2"/>
+        <circle class="wheel" cx="12" cy="13.5" r="4.2"/>
+        <circle class="wheel" cx="34" cy="13.5" r="4.2"/>
+      </g>
+      <g class="car cc">
+        <polygon class="beam" points="46,2 70,-3 70,12 46,8"/>
+        <rect class="body" x="0" y="0" width="46" height="13" rx="6.5"/>
+        <path class="body" d="M11,0 q4,-9 12,-9 h10 q8,0 12,9 z"/>
+        <circle class="hlgt" cx="44.5" cy="4.5" r="2.4"/>
+        <circle class="tlgt" cx="2.5" cy="5" r="2"/>
+        <circle class="wheel" cx="12" cy="13.5" r="4.2"/>
+        <circle class="wheel" cx="34" cy="13.5" r="4.2"/>
+      </g>
+      <!-- 外卖电动车（人行道上沿向右，与远车道同向；夜亮车前灯） -->
+      <g class="ebike">
+        <polygon class="ebeam" points="33,-7.5 49,-10.5 49,-2.5 33,-3.5"/>
+        <path class="eframe" d="M7,-3.6 L14,-12 H27 L31,-3.6 Z"/>
+        <path class="eframe" d="M29,-4.5 L25.2,-20.5 M25.2,-20.5 L21,-20.5"/>
+        <path class="erider" d="M13,-13.5 Q13,-21 20,-23.5 L23,-21.5 Q18,-18 17.5,-12 Z"/>
+        <path class="erider" d="M16,-19 L25,-19.8 L24.6,-17.6 L16.4,-17.2 Z"/>
+        <path class="erider" d="M14,-13 L18.5,-8.5 L16.5,-5.5 L12,-11 Z"/>
+        <circle class="erider" cx="23.5" cy="-25.2" r="2.6"/>
+        <path class="ehelm" d="M20.8,-25.6 Q23,-29.3 26.3,-26.9 L26.6,-25.4 Z"/>
+        <rect class="ebox" x="1.5" y="-23.5" width="11" height="11" rx="2"/>
+        <rect class="emark" x="4" y="-20" width="6" height="4" rx="1"/>
+        <circle class="elamp" cx="32" cy="-5.2" r="1.5"/>
+        <circle class="ewheel" cx="7" cy="-3.6" r="3.6"/>
+        <circle class="ewheel" cx="31" cy="-3.6" r="3.6"/>
+      </g>
+      <!-- 路灯（夜发光） -->
+      <g class="lamp" transform="translate(118,0)">
+        <rect class="pole" x="-2" y="412" width="4" height="60" rx="2"/>
+        <circle class="halo" cx="0" cy="410" r="15"/>
+        <circle class="lhead" cx="0" cy="410" r="4.5"/>
+      </g>
+      <g class="lamp" transform="translate(530,0)">
+        <rect class="pole" x="-2" y="412" width="4" height="60" rx="2"/>
+        <circle class="halo" cx="0" cy="410" r="15"/>
+        <circle class="lhead" cx="0" cy="410" r="4.5"/>
+      </g>
+      <!-- 雷达波纹（转场爆发 + 等待页循环） -->
+      <g class="ripples">
+        <circle class="rr rr1" cx="342" cy="16" r="12"/>
+        <circle class="rr rr2" cx="342" cy="16" r="12"/>
+      </g>
+    </svg>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var root=document.documentElement;
+var stage=$('stage');
+var reduced=false;
+try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
+
+/* ---------------- 时钟 HH:MM ---------------- */
+var clockEl=$('clock');
+function pad(n){return n<10?'0'+n:''+n;}
+function tickClock(){var d=new Date();clockEl.textContent=pad(d.getHours())+':'+pad(d.getMinutes());}
+tickClock();setInterval(tickClock,1000);
+
+/* ---------------- 楼群窗户（稳定伪随机决定哪些窗入夜点亮） ---------------- */
+(function buildWins(){
+  var NS='http://www.w3.org/2000/svg';
+  var host=$('wins');
+  var spec=[
+    {x:298,y:46, w:88,h:424,cols:3,rows:9,hero:1,lit:.62},   /* 主楼 */
+    {x:156,y:118,w:74,h:352,cols:3,rows:8,lit:.5},
+    {x:404,y:98, w:66,h:372,cols:3,rows:8,lit:.46},
+    {x:488,y:168,w:62,h:302,cols:3,rows:6,lit:.5},
+    {x:232,y:262,w:64,h:208,cols:3,rows:4,lit:.55},
+    {x:640,y:302,w:68,h:168,cols:3,rows:3,lit:.5},
+    {x:6,  y:212,w:66,h:258,cols:2,rows:6,lit:.35},
+    {x:80, y:164,w:60,h:306,cols:2,rows:7,lit:.4},
+    {x:536,y:238,w:62,h:232,cols:2,rows:5,lit:.35},
+    {x:606,y:192,w:72,h:278,cols:3,rows:6,lit:.4}
+  ];
+  function seeded(n){var x=Math.sin(n*127.1+311.7)*43758.5453;return x-Math.floor(x);}
+  var idx=0;
+  spec.forEach(function(b){
+    var mx=Math.max(10,Math.round(b.w*0.15));
+    var gap=8;
+    var ww=Math.floor((b.w-2*mx-(b.cols-1)*gap)/b.cols);
+    var wh=12;
+    var step=Math.floor((b.h-30-wh)/(b.rows-1));
+    for(var r=0;r<b.rows;r++){
+      for(var c=0;c<b.cols;c++){
+        var t=document.createElementNS(NS,'rect');
+        t.setAttribute('x',b.x+mx+c*(ww+gap));
+        t.setAttribute('y',b.y+16+r*step);
+        t.setAttribute('width',ww);
+        t.setAttribute('height',wh);
+        t.setAttribute('rx',1.6);
+        var on=seeded(idx*7+3)<b.lit;
+        t.setAttribute('class','w'+(b.hero?' wH':'')+(on?' lit':''));
+        t.style.setProperty('--i',String(idx%12));
+        host.appendChild(t);
+        idx++;
+      }
+    }
+  });
+})();
+
+/* ---------------- 昼夜（切换先经暖橙霞再落目标态） ---------------- */
+var dnBtn=$('dn'),scene=$('scene');
+var duskT1=null,duskT2=null;
+function isNightByTime(){var h=new Date().getHours();return h>=18||h<6;}
+function applyNight(on){
+  root.classList.toggle('night',on);
+  dnBtn.setAttribute('aria-pressed',on?'true':'false');
+}
+/* fast 供等待页转场用：dusk 压缩在 0.4s 量级 */
+function setNight(on,fast){
+  if(duskT1){clearTimeout(duskT1);duskT1=null;}
+  if(duskT2){clearTimeout(duskT2);duskT2=null;}
+  root.classList.remove('dusk','dawn','duskout','fast');
+  var was=root.classList.contains('night');
+  if(reduced||on===was){applyNight(on);return;}
+  if(fast)root.classList.add('fast');
+  root.classList.add('dusk');
+  if(!on)root.classList.add('dawn');   /* 夜转昼走浅一档的黎明色 */
+  duskT1=setTimeout(function(){
+    duskT1=null;
+    root.classList.remove('dusk','dawn');
+    root.classList.add('duskout');
+    applyNight(on);
+    duskT2=setTimeout(function(){
+      duskT2=null;
+      root.classList.remove('duskout','fast');
+    },fast?550:1000);
+  },fast?500:850);
+}
+setNight(isNightByTime());   /* 与 head 内首帧脚本一致，幂等 */
+function toggleDN(){
+  if(stage.classList.contains('onwait'))return;   /* 等待页保持夜景 */
+  setNight(!root.classList.contains('night'));
+}
+dnBtn.addEventListener('click',toggleDN);
+scene.addEventListener('click',toggleDN);
+
+/* ---------------- 流星（仅夜，三颗独立流星 4-9s 各自随机，1s 划过） ---------------- */
+var meteor=$('meteor');
+var meteorPool=[meteor];
+for(var mi=0;mi<2;mi++){
+  var mc=meteor.cloneNode(true);
+  mc.removeAttribute('id');
+  meteor.parentNode.appendChild(mc);
+  meteorPool.push(mc);
+}
+function dropMeteor(m){
+  if(!reduced&&root.classList.contains('night')){
+    m.setAttribute('transform','translate('+Math.round(400+Math.random()*230)+','+Math.round(24+Math.random()*78)+')');
+    m.classList.remove('run');
+    m.getBoundingClientRect();   /* 强制回流以便重启动画 */
+    m.classList.add('run');
+  }
+  setTimeout(function(){dropMeteor(m);},4000+Math.random()*5000);
+}
+meteorPool.forEach(function(m,i){
+  setTimeout(function(){dropMeteor(m);},2000+i*2600+Math.random()*3000);
+});
+
+/* ---------------- 探测本地服务 ---------------- */
+var online=false,alive=null,netHintText='';
+function setHint(t){$('hintline').textContent=t||'';}
+function flashHint(t){setHint(t);setTimeout(function(){setHint(netHintText);},5000);}
+function paintStatus(){
+  var dot=$('dot');
+  $('replink').hidden=!online;   /* 离线/降级复制模式下无后端，/reports/ 会 404，隐藏入口 */
+  if(!online){dot.hidden=true;netHintText='';setHint('');return;}
+  dot.hidden=(alive===null);
+  dot.classList.toggle('on',alive===true);
+  netHintText=(alive===false)?'电脑端 Claude 未接收，请先在电脑端开启':'';
+  setHint(netHintText);
+}
+fetch('/ping')
+  .then(function(r){if(!r.ok)throw new Error('no');return r.json();})
+  .then(function(d){online=true;alive=(d&&typeof d.alive==='boolean')?d.alive:null;})
+  .catch(function(){online=false;alive=null;})
+  .then(paintStatus);
+
+/* ---------------- 复制兜底 ---------------- */
+function execCopy(text){
+  var t=document.createElement('textarea');
+  t.value=text;
+  t.style.position='fixed';t.style.top='-100px';t.style.opacity='0';
+  document.body.appendChild(t);
+  try{
+    t.focus();
+    if(t.setSelectionRange)t.setSelectionRange(0,text.length);else t.select();
+    return document.execCommand('copy');
+  }catch(e){return false;}
+  finally{document.body.removeChild(t);}
+}
+function copyText(text){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text).then(function(){return true;},
+      function(){return execCopy(text);});
+  }
+  return Promise.resolve(execCopy(text));
+}
+function showCopybox(p){
+  var box=$('copybox');
+  box.innerHTML='';
+  var t=document.createElement('div');t.className='ct';t.textContent=p;
+  var tip=document.createElement('div');tip.className='ctip';
+  tip.textContent='自动复制失败，点击上面的文字全选后手动复制';
+  box.appendChild(t);box.appendChild(tip);
+  box.hidden=false;
+  function sel(){
+    var rg=document.createRange();rg.selectNodeContents(t);
+    var s=window.getSelection();s.removeAllRanges();s.addRange(rg);
+  }
+  t.addEventListener('click',sel);
+  sel();
+}
+var PROMPT_HEAD='请用 rent-assist skill 处理：';
+function copyFlow(text){
+  var p=PROMPT_HEAD+text;
+  copyText(p).then(function(ok){
+    if(ok){flashGo('已复制');flashHint('已复制提问，去 Claude 粘贴发送即可');}
+    else{showCopybox(p);}
+  });
+}
+
+/* ---------------- 提交 ---------------- */
+var form=$('askForm'),input=$('need'),go=$('go');
+var goHTML=go.innerHTML;
+function flashGo(label){
+  go.innerHTML='<span class="goflash">'+label+'</span>';
+  setTimeout(function(){go.innerHTML=goHTML;},1900);
+}
+form.addEventListener('submit',function(e){e.preventDefault();send();});
+function send(){
+  var text=input.value.trim();
+  if(!text){input.focus();return;}
+  if(!online){input.value='';copyFlow(text);return;}   /* 离线：不转场，留在首页 */
+  go.disabled=true;
+  fetch('/run',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({text:text})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(!d||!d.ok){throw new Error((d&&d.error)||'启动失败');}
+    input.value='';                 /* demo / inbox / 普通模式一律同流程 */
+    startWaiting();
+  }).catch(function(){
+    input.value='';
+    go.disabled=false;
+    flashHint('没连上服务，已切换为复制模式');
+    copyFlow(text);
+  });
+}
+
+/* ---------------- 转场三拍 + 进入等待 ---------------- */
+function startWaiting(){
+  since=Date.now();
+  if(reduced){
+    setNight(true);
+    stage.classList.add('zoom','onwait');
+    afterEnterWait();
+    return;
+  }
+  stage.classList.add('t1');                                        /* 拍1 输入组收起 */
+  setTimeout(function(){                                            /* 拍2 大字上移淡出、场景放大居中入夜（快速走一次霞） */
+    stage.classList.add('t2','zoom');
+    setNight(true,true);
+  },330);
+  setTimeout(function(){stage.classList.add('burst');},1020);       /* 拍3 天线雷达波纹 */
+  setTimeout(function(){                                            /* 整屏淡入等待页 */
+    stage.classList.add('onwait');
+    afterEnterWait();
+  },1520);
+  setTimeout(function(){stage.classList.remove('t1','t2','burst');},2600);
+}
+
+/* ---------------- 等待页：计时 / 阶段 / 轮询 / 就绪 ---------------- */
+var PHASES=['正在理解你的需求','正在多平台采集口碑','正在清洗去重','正在分析风险','正在生成报告'];
+var since=0,timerIv=null,phaseIv=null,pollIv=null,phaseIdx=0,phaseTok=0;
+function stopIvs(){
+  if(timerIv)clearInterval(timerIv);
+  if(phaseIv)clearInterval(phaseIv);
+  if(pollIv)clearInterval(pollIv);
+  timerIv=phaseIv=pollIv=null;
+}
+function afterEnterWait(){
+  stage.classList.add('loop');
+  $('waiting').classList.remove('ready');
+  $('wReady').hidden=true;
+  $('wOpenNote').hidden=true;
+  startTimer();startPhases();startPolling();
+  try{$('wBack').focus({preventScroll:true});}catch(e){}
+}
+function startTimer(){
+  var el=$('wClock');
+  function fn(){
+    var s=Math.max(0,Math.floor((Date.now()-since)/1000));
+    var m=Math.floor(s/60),sec=s%60;
+    el.textContent=pad(m)+':'+pad(sec);
+  }
+  fn();
+  timerIv=setInterval(fn,1000);
+}
+function startPhases(){
+  var el=$('wPhase');
+  var tok=++phaseTok;
+  phaseIdx=0;
+  el.textContent=PHASES[0];
+  el.classList.remove('out');
+  phaseIv=setInterval(function(){
+    phaseIdx=(phaseIdx+1)%PHASES.length;
+    el.classList.add('out');
+    setTimeout(function(){
+      if(tok!==phaseTok)return;
+      el.textContent=PHASES[phaseIdx];
+      el.classList.remove('out');
+    },reduced?0:430);
+  },8000);
+}
+function startPolling(){
+  pollIv=setInterval(function(){
+    fetch('/status?since='+since)
+      .then(function(r){return r.json();})
+      .then(function(s){
+        if(s&&s.report){stopIvs();onReady(s.report);}
+      })
+      .catch(function(){});
+  },5000);
+}
+function onReady(name){
+  var url='/reports/'+encodeURIComponent(name);
+  $('wOpen').href=url;
+  $('wReady').hidden=false;
+  $('waiting').classList.add('ready');
+  var w=window.open(url,'_blank');       /* 可能被拦，按钮兜底 */
+  if(!w){$('wOpenNote').hidden=false;}
+  try{$('wOpen').focus({preventScroll:true});}catch(e){}
+}
+
+/* ---------------- 返回首页 ---------------- */
+$('wBack').addEventListener('click',function(){
+  stopIvs();
+  phaseTok++;
+  stage.classList.remove('onwait','zoom','loop','t1','t2','burst');
+  $('waiting').classList.remove('ready');
+  $('wReady').hidden=true;
+  $('wOpenNote').hidden=true;
+  setNight(isNightByTime());
+  go.disabled=false;
+  go.innerHTML=goHTML;
+  try{input.focus({preventScroll:true});}catch(e){}
+});
+})();
+</script>
+</body>
+</html>

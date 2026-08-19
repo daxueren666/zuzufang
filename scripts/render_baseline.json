@@ -1,0 +1,60 @@
+{
+ "templates": {
+  "report.html.j2": {
+   "diligence 全字段无geo": [
+    "candidates[0].name=本一区",
+    "candidates[0].pros=离地铁近。",
+    "candidates[0].cons=房龄老。",
+    "candidates[0].commute=到国贸约 60 分钟。"
+   ],
+   "listings 无评分": [
+    "risk_level=中风险"
+   ],
+   "locate 空发现": [
+    "risk_level=中风险"
+   ],
+   "recommend geo无通勤标记": [
+    "geo.around.groups[1].pois[0].address=东小口"
+   ],
+   "recommend 全字段带geo用户提供通勤地": [
+    "geo.around.groups[1].pois[0].address=东小口"
+   ],
+   "真实天通苑": [
+    "findings[0].summary=多源交叉证实：小红书避坑帖图片数据（房源构成约 90% 中介 + 9% ",
+    "findings[2].risk=公寓运营帖伪装'房东直租'",
+    "findings[2].summary='1600 一居室可短租可养宠'实为公寓管理员批量运营（自称管理几百套房",
+    "findings[2].evidence[0].quote=北京租房|天通苑一居室1600，可短租可养宠（正文自述'本人是公寓管理员",
+    "findings[3].summary=本五区楼下即商场超市、生活'打包好'，但小区内商业带来人流噪音；多层+电",
+    "findings[3].evidence[0].quote=小区里就有商场和超市……但它也不是那种'安静型小区'；停车难",
+    "positive[1]=生活配套成熟：商场/超市/医院/公园齐备，多区'15分钟生活圈'",
+    "positive[2]=口碑回升：'交通、公园、医院、商业和居住环境都在慢慢变好，越来越宜居'（",
+    "positive[3]=北漂归属感强：'十年北漂买在天通苑一点都不丢人，反而超硬气'（486赞）",
+    "suggestions[1]=押金条款写明退还条件与时限，'押一付一'的公寓问清水电性质（商水商电很贵",
+    "suggestions[3]=求'真房东直租'优先看豆瓣小组与小红书个人帖，警惕'免中介费'引流的公寓",
+    "candidates[0].pros=5号线地铁5分钟；楼间距宽、花园中心、停车位足，'闲'得像家；一居350",
+    "geo.around.groups[1].pois[0].address=(停运)快速直达专线170路;620路;628路;专48路;专58路;快",
+    "geo.around.groups[1].pois[1].address=301路;530路",
+    "geo.around.groups[1].pois[2].address=301路;530路;专48路;夜26路",
+    "geo.around.groups[2].pois[0].address=东小口镇天通苑5区商业楼(天通苑南地铁站A南口步行360米)",
+    "geo.around.groups[2].pois[1].address=立汤路182号",
+    "geo.around.groups[2].pois[2].address=立汤路186号",
+    "geo.around.groups[3].pois[0].address=天通苑六区10号",
+    "geo.around.groups[3].pois[1].address=东小口镇天通苑二区14号楼2门",
+    "geo.around.groups[3].pois[2].address=天通二区二号楼101",
+    "geo.around.groups[4].pois[0].address=天通苑六区南2门西70米",
+    "geo.around.groups[4].pois[1].address=靓车堂天通苑店东门西南120米",
+    "geo.around.groups[4].pois[2].address=丽水园小区5号楼一层102底商",
+    "geo.around.groups[5].pois[0].address=天通中苑75号",
+    "geo.around.groups[5].pois[1].address=天北街道,东至现状住宅用地,南至太平庄中街,西至现状天通苑体育馆和清华附",
+    "geo.around.groups[5].pois[2].address=天通苑4区9号",
+    "geo.around.groups[6].pois[0].address=立汤路172号",
+    "geo.around.groups[6].pois[1].address=中滩村北二街与立水桥东一路交叉口西南150米",
+    "geo.around.groups[7].pois[0].address=北京城区北京城区天通苑六区12号楼1层至2层",
+    "geo.around.groups[7].pois[1].address=北京城区天通苑六区西门旁",
+    "geo.around.groups[7].pois[2].address=天通苑六区西门旁"
+   ],
+   "边界全空": []
+  }
+ },
+ "updated_at": "2026-08-17T18:46:12"
+}
