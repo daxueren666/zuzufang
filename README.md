@@ -37,7 +37,7 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 | 功能 | 需要准备 | 一次性操作 |
 |---|---|---|
 | 基础（采集/清洗/报告） | Python 3.11+，能执行本地命令的 CLI agent（Claude Code、Codex CLI 等） | — |
-| 小红书源 | Chrome 浏览器 | 装 Agent-Reach + Chrome 扩展后 `opencli xiaohongshu login`，扫码一次 |
+| 小红书源 | Chrome 浏览器 | 装好 Agent-Reach 与 Chrome 扩展后扫码登录一次（命令见下） |
 | 豆瓣源 | — | 首次采集会弹浏览器，登录一次，之后免扫 |
 | 抖音源 | — | 首次采集用抖音 App 扫码一次，之后免扫 |
 | 地图 | 高德 key（免费，申请步骤见下方「可选配置」） | — |
@@ -78,9 +78,19 @@ agent-reach install --env=auto --system
 ### 小红书还要两步（其他源不用）
 
 1. Chrome 装 OpenCLI 扩展：打开 [Chrome 应用商店的 OpenCLI 页面](https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk)，点「添加至 Chrome」（浏览器扩展不允许命令行代装，这是全程唯一的手动步骤）
-2. 执行 `opencli xiaohongshu login`：会拉起 Chrome 扫码登录小红书，一次即可；`opencli doctor` 显示 `Extension: connected` 就通了
+2. 打开终端（Windows 用 PowerShell，macOS 用终端），粘贴运行下面这条，会拉起 Chrome 扫码登录小红书，扫一次就行：
 
-装完跑下面安装节的 `check_deps.py` 做总验证。
+```bash
+opencli xiaohongshu login
+```
+
+验证：再运行下面这条，看到 `Extension: connected` 就是通了——
+
+```bash
+opencli doctor
+```
+
+全部装完后，到「安装」节跑最后一条 `check_deps.py` 做总验证。
 
 ## 安装
 
