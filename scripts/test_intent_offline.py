@@ -32,6 +32,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import collect_douban as cdb   # noqa: E402
+import collect_douyin as cdy   # noqa: E402
 import run_collect as rc       # noqa: E402
 
 PASS, FAIL = 0, 0
@@ -213,6 +214,50 @@ def test_run_collect_worker_cmd_passthrough():
     check("build_worker_cmd(并行): --douban-intent 随 worker 命令透传", ok1 and ok2)
 
 
+def test_run_collect_min_clamp_and_top_comments():
+    """#8: --min-per-platform 与用户显式上限冲突时夹紧；#16: --top-comments
+    串行/并行两条链路均透传（douyin 落回 20 是子脚本抓评地板值，非透传缺失）。"""
+    # ① 夹紧：--per-platform 5（min 默认 20）→ 5
+    ok1 = rc.effective_min(20, 5, [5, 5]) == 5
+    # ② 夹紧：--target 折算每平台配额 8（min 20）→ 8，不突破用户上限
+    ok2 = rc.effective_min(20, None, [8, 8, 8, 8]) == 8
+    # ③ 未冲突：min 5 < 上限 20 → 不动
+    ok3 = rc.effective_min(5, 20, [20]) == 5
+    # ④ 串行 run_one_batch 透传 --top-comments（默认 20）给子脚本
+    captured = []
+
+    def fake_run(cmd, **k):
+        captured.append(cmd)
+        return _FakeCompleted()
+
+    orig_run = _patch(rc.subprocess, "run", fake_run)
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            args = _parse_rc(["--out-dir", td])
+            rc.run_one_batch(rc.SCRIPTS_DIR, "douyin", "天通苑 住过", args)
+    finally:
+        _patch(rc.subprocess, "run", orig_run)
+    cmd = captured[-1]
+    ok4 = ("--top-comments" in cmd
+           and cmd[cmd.index("--top-comments") + 1] == "20"
+           and "--limit" in cmd)
+    # ⑤ 并行 build_worker_cmd 透传 --top-comments 且 min 已按配额夹紧
+    with tempfile.TemporaryDirectory() as td:
+        args = _parse_rc(["--top-comments", "5"])
+        wcmd = rc.build_worker_cmd(args, "douyin", 10, Path(td) / "run")
+        ok5 = (wcmd[wcmd.index("--top-comments") + 1] == "5"
+               and wcmd[wcmd.index("--min-per-platform") + 1] == "10"
+               and wcmd[wcmd.index("--per-platform") + 1] == "10")
+    # ⑥ collect_douyin #16: 读回后按 --limit 硬截断（保排序，limit<=0 不截）
+    recs = [{"i": i} for i in range(7)]
+    kept, dropped = cdy.truncate_limit(recs, 5)
+    ok6 = (len(kept) == 5 and kept[0]["i"] == 0 and dropped == 2
+           and cdy.truncate_limit(recs, 0)[1] == 0
+           and cdy.truncate_limit(recs, 9)[1] == 0)
+    check("effective_min 夹紧用户上限 + --top-comments 串行/并行透传 + truncate_limit",
+          ok1 and ok2 and ok3 and ok4 and ok5 and ok6)
+
+
 def main():
     print("== collect_douban 意图拆分 ==")
     test_title_relevant_word_intent()
@@ -222,6 +267,7 @@ def main():
     print("== run_collect 透传 ==")
     test_run_collect_intent_passthrough()
     test_run_collect_worker_cmd_passthrough()
+    test_run_collect_min_clamp_and_top_comments()
     print()
     print("离线自测: %d 通过 / %d 失败" % (PASS, FAIL))
     sys.exit(0 if FAIL == 0 else 1)

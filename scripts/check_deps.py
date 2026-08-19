@@ -13,13 +13,16 @@ doctor ok 但真实采集 exit 3 / opencli 69）。故 xiaohongshu 在 doctor ok
 "无法确认"降级提示（不阻塞其他源检查、不改变该源判定）。
 
 用法:
-    python check_deps.py
+    python check_deps.py            # 完整检查（含 xhs 真实搜索探测）
+    python check_deps.py --offline  # 离线快速自检（跳过 xhs 真实搜索探测）
 """
 
 import json
 import shutil
 import subprocess
 import sys
+
+OFFLINE = "--offline" in sys.argv
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -81,6 +84,10 @@ def print_install_guide(reason):
 
 
 def main():
+    print("[check_deps] Python 版本: %s" % sys.version.split()[0])
+    if sys.version_info < (3, 10):
+        print("[check_deps] [警告] Python 主版本低于 3.10，未经测试，建议升级到 3.10+",
+              file=sys.stderr)
     print("[check_deps] 数据目录: %s" % ac.data_dir(create=False))
     t = ac.tools_dir()
     print("[check_deps] 工具目录: %s（MediaCrawler: %s / asr-venv: %s）"
@@ -124,8 +131,11 @@ def main():
         ok = status == "ok"
 
         # xiaohongshu：doctor ok 只是弱口径，再跑真实搜索探测定真伪
-        # （doctor 本身不可用时保持原判定与提示，不额外探测）。
-        if key == "xiaohongshu" and ok:
+        # （doctor 本身不可用时保持原判定与提示，不额外探测；
+        #   --offline 时跳过真实探测，避免离线环境误报）。
+        if key == "xiaohongshu" and ok and OFFLINE:
+            message = "doctor ok（[offline] 未做真实搜索探测）"
+        elif key == "xiaohongshu" and ok:
             probe_status, probe_msg = probe_xhs_real()
             if probe_status == "ok":
                 message = probe_msg

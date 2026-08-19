@@ -385,6 +385,74 @@ def test_cli_blank_line_silent(capsys=None):
     check("raw 空白行静默跳过（无坏行告警）", ok)
 
 
+def test_cli_douyin_entity_relaxed():
+    """#18：抖音帖正文不含标的词时，标题/top 评论命中标的词或地标词即保留。"""
+    with tempfile.TemporaryDirectory() as td:
+        rows = [
+            # 放宽保留①：标题+正文都无"龙泽苑"，但评论提到 → 保留
+            {"platform": "douyin", "query": "龙泽苑", "url": "https://dy/1",
+             "title": "租房避坑指南，看完少走弯路（测试）",
+             "content": "在北京租房一定要注意这几点（测试）",
+             "published_at": "2026-08-10", "likes": 10, "comments_count": 2,
+             "comments": [{"text": "龙泽苑附近就这样，坑得很（测试）", "likes": 5}],
+             "extra": {}},
+            # 放宽保留②：标题/正文均无标的词，评论命中 → 保留
+            {"platform": "douyin", "query": "龙泽苑租房", "url": "https://dy/2",
+             "title": "回龙观这块住着怎么样（测试）", "content": "讲讲真实感受（测试）",
+             "published_at": "2026-08-10", "likes": 3, "comments_count": 1,
+             "comments": [{"text": "龙泽苑也差不多情况（测试）", "likes": 2}],
+             "extra": {}},
+            # 无任何信号 → 仍剔除（放宽不放水）
+            {"platform": "douyin", "query": "龙泽苑", "url": "https://dy/3",
+             "title": "北京租房攻略大全（测试）", "content": "通用攻略内容（测试）",
+             "published_at": "2026-08-10", "likes": 1, "comments_count": 0,
+             "comments": [], "extra": {}},
+            # 非抖音平台同形态（评论命中）不放宽 → 剔除（行为不变）
+            {"platform": "xhs", "query": "龙泽苑", "url": "https://xhs/4",
+             "title": "租房避坑指南（测试）", "content": "通用攻略（测试）",
+             "published_at": "2026-08-10", "likes": 2, "comments_count": 1,
+             "comments": [{"text": "龙泽苑附近就这样（测试）", "likes": 1}],
+             "extra": {}},
+        ]
+        result = _run_cli_rows(td, rows, [])
+        titles = [it["title"] for it in result["items"]]
+        ok = (result["meta"]["douyin_relaxed"] == 2
+              and "租房避坑指南，看完少走弯路（测试）" in titles
+              and "回龙观这块住着怎么样（测试）" in titles
+              and result["meta"]["filtered_no_entity"] == 2
+              and not any(t == "北京租房攻略大全（测试）" for t in titles))
+    check("CLI 抖音实体放宽：标题/评论命中即保留 douyin_relaxed 计数，无信号仍剔", ok)
+
+
+def test_cli_seo_page_filter():
+    """#19：SEO 模板列表页（挂牌价格堆叠）剔除并计 meta.seo_pages，口碑帖不误杀。"""
+    stack = "\n".join("%d元/月 %d室" % (p, i % 3 + 1)
+                      for i, p in enumerate(range(2000, 7000, 800)))
+    with tempfile.TemporaryDirectory() as td:
+        rows = [
+            # 命中①：标题"租房-价格筛选"模板 + 正文价格堆叠 → 剔
+            _web_row("优优好房 龙泽苑租房-价格筛选（测试）", stack,
+                     url="https://bj.58.com/zufang/"),
+            # 命中②："整租·"标题 + 多区间价格 + 堆叠 → 剔
+            _web_row("整租·龙泽苑房源大全（测试）",
+                     "2000-3000 与 4000-5000\n" + stack,
+                     url="https://youfangke.com/zufang/list"),
+            # 反例①：URL 是筛选页但正文价格少（正常讨论帖） → 留
+            _web_row("龙泽苑房租讨论（测试）", "现在一居大概3000元/月，涨了不少",
+                     url="https://bj.58.com/zufang/123.shtml"),
+            # 反例②：标题含价格词但正文无堆叠 → 留
+            _web_row("龙泽苑租房价格感受（测试）", "龙泽苑租金亲身经历分享（测试）",
+                     url="https://zhihu.com/q/9"),
+        ]
+        result = _run_cli_rows(td, rows, [])
+        titles = [it["title"] for it in result["items"]]
+        ok = (result["meta"]["seo_pages"] == 2
+              and "龙泽苑房租讨论（测试）" in titles
+              and "龙泽苑租房价格感受（测试）" in titles
+              and not any("优优好房" in t or "整租·" in t for t in titles))
+    check("CLI SEO 模板列表页剔除（标题/URL 特征+价格堆叠双信号），口碑帖不误杀", ok)
+
+
 def main():
     print("== lexicon.detect_seek_post ==")
     test_detect_seek_hit()
@@ -401,6 +469,8 @@ def main():
     test_cli_city_filter_v2()
     test_cli_city_off_by_default()
     test_cli_listing_page_filter()
+    test_cli_douyin_entity_relaxed()
+    test_cli_seo_page_filter()
     test_cli_blank_line_silent()
     print()
     print("离线自测: %d 通过 / %d 失败" % (PASS, FAIL))

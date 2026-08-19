@@ -267,8 +267,10 @@ def build_context(analysis: dict, cleaned: dict, out_name_hint: str = ""):
 
     t_name = str(target.get("name") or "").strip()
     if mode == "faq":
-        t_name = t_name or (faq["target_name"] if faq else "") \
-            or (faq["question"][:24] if faq else "") or "租房答疑"
+        # 文件名优先用问题原话（同主题不同问题不互相覆盖），target.name 仅兜底；
+        # target 整体缺失/非 dict 已在上面归一为 {}，type 为"咨询"等非枚举值不影响展示
+        t_name = (faq["question"][:24] if faq else "") \
+            or (faq["target_name"] if faq else "") or t_name or "租房答疑"
     if not t_name:
         t_name = "未知标的"
 

@@ -46,6 +46,47 @@ from lexicon import (  # noqa: E402
 SKILL_ROOT = Path(__file__).resolve().parent.parent
 _UNSAFE_RE = re.compile(r'[\\/:*?"<>|\r\n\t ]+')
 
+# ---- SEO 模板列表页识别（#19，保守：宁可漏杀不可误杀正常口碑帖） ----
+# 标题模板特征："租房-价格筛选"类页面名 / "整租·""合租·"挂牌头 + 多区间价格
+_SEO_TEMPLATE_TITLE_RE = re.compile(r"租房\s*[-–—_ ]*\s*价格|价格筛选")
+_SEO_RANGE_PRICE_RE = re.compile(r"\d{4}\s*[-~至]\s*\d{4}")
+# URL 列表/筛选页模式（路径型，不用裸关键词，避免误伤正文页）
+_SEO_LIST_URL_RE = re.compile(
+    r"/zufang/[a-z0-9_]*?(?:$|[/?#])|/rent/(?:list|search)|[?&](?:price|filter|list)=",
+    re.I)
+# 正文挂牌价格堆叠："2500元/月" / "3500/月" 等
+_SEO_PRICE_LINE_RE = re.compile(r"\d{3,6}\s*元?\s*/\s*月|\d{3,6}\s*元/月")
+_SEO_PRICE_STACK_MIN = 5  # 堆叠阈值：正文价格/月表述少于该数不判（防误杀口碑帖）
+
+# 抖音实体放宽（#18）：query 剥掉泛词后剩下的地标词作为放宽匹配词
+_QUERY_NOISE_RE = re.compile(r"租房|小区|推荐|怎么样|怎样|附近|房子|出租|找房|避坑")
+
+
+def douyin_relaxed_terms(entity_terms, query):
+    """放宽词条 = 实体闸门词条 + query 剥泛词后的地标词（归一化，长度>=2）。"""
+    terms = list(entity_terms)
+    stripped = norm_entity_text(_QUERY_NOISE_RE.sub("", str(query or "")))
+    if len(stripped) >= 2 and stripped not in terms:
+        terms.append(stripped)
+    return terms
+
+
+def detect_seo_listing_page(title, url, content) -> bool:
+    """SEO 模板列表页判定（#19，仅 web 源）。
+
+    特征保守组合：标题命中挂牌模板特征（"租房-价格"页名，或"整租·/合租·"
+    + 多区间价格）或 URL 为列表/筛选页模式，且正文为多条挂牌价格堆叠
+    （>= SEO_PRICE_STACK_MIN 处"价格/月"表述）。任一特征单独出现不判。
+    """
+    t, u, c = str(title or ""), str(url or ""), str(content or "")
+    title_hint = bool(_SEO_TEMPLATE_TITLE_RE.search(t)) or (
+        ("整租·" in t or "合租·" in t)
+        and len(_SEO_RANGE_PRICE_RE.findall(t + c)) >= 2)
+    url_hint = bool(_SEO_LIST_URL_RE.search(u))
+    if not (title_hint or url_hint):
+        return False
+    return len(_SEO_PRICE_LINE_RE.findall(c)) >= _SEO_PRICE_STACK_MIN
+
 
 def slugify(text: str, maxlen: int = 40) -> str:
     """文件名安全化：去掉路径非法字符与空白，保留中文。"""
@@ -354,6 +395,8 @@ def main():
     city_kept_signal = 0
     city_skipped_non_web = 0
     listing_pages = 0
+    douyin_relaxed = 0
+    seo_pages = 0
 
     seen_hashes, items = set(), []
     total_raw = 0
@@ -403,10 +446,28 @@ def main():
         #    默认剔除；--no-entity-filter 时仅标记不剔除。命中判定不掺入评论/点赞。
         head_norm = norm_entity_text(f"{row.get('title') or ''}{row.get('content') or ''}")
         entity_hit = any(t in head_norm for t in entity_terms) if entity_terms else True
-        if not entity_hit:
-            if entity_filter_on:
-                filtered_no_entity += 1
-                continue
+        if not entity_hit and entity_terms:
+            # ⑤a 抖音放宽（#18）：抖音标题带小区名比例低、信号在正文/评论——
+            #     正文不含标的词时，标题命中或任一 top 评论命中（标的词或 query
+            #     地标词）即保留，计 meta.douyin_relaxed
+            if str(row.get("platform") or "").lower() == "douyin":
+                relaxed_terms = douyin_relaxed_terms(entity_terms, args.query)
+                title_norm = norm_entity_text(str(row.get("title") or ""))
+                cmt_raw = row.get("comments")
+                cmt_texts = []
+                if isinstance(cmt_raw, list):
+                    for cm in cmt_raw:
+                        cmt_texts.append(
+                            str(cm.get("text") or "") if isinstance(cm, dict)
+                            else str(cm or ""))
+                cmt_norm = norm_entity_text("".join(cmt_texts))
+                if any(t in title_norm or t in cmt_norm for t in relaxed_terms):
+                    entity_hit = True
+                    douyin_relaxed += 1
+            if not entity_hit:
+                if entity_filter_on:
+                    filtered_no_entity += 1
+                    continue
         # ⑤b 城市消歧（--city 启用）：URL 城市子域仅判 web 项；标题/正文前 200 字的
         #     异城名+租赁词判定覆盖全部平台（实测济宁/青岛/上海撞名帖均来自
         #     xhs/douban/douyin）；本市信号白名单兜底（meta.city_kept_signal）
@@ -432,6 +493,14 @@ def main():
                 and _to_int(row.get("likes")) == 0
                 and detect_listing_page(str(row.get("title") or ""))):
             listing_pages += 1
+            continue
+        # ⑤d SEO 模板列表页（#19，web 源）：标题/URL 命中挂牌模板特征且正文
+        #     为多条挂牌价格堆叠（如"优优好房"筛选页）→ 剔除并计 meta.seo_pages；
+        #     特征保守（需双重信号），宁可漏杀不误杀正常口碑帖
+        if (str(row.get("platform") or "").lower() == "web"
+                and detect_seo_listing_page(row.get("title"), row.get("url"),
+                                            row.get("content"))):
+            seo_pages += 1
             continue
         # ⑥ 求租帖：发帖人本人在找房（非出租非居住评价），识别即计数（meta.seek_posts），
         #    默认剔除；--keep-seek 保留并打 seek_post 标记
@@ -474,6 +543,8 @@ def main():
             "city_kept_signal": city_kept_signal,
             "city_skipped_non_web": city_skipped_non_web,
             "listing_pages": listing_pages,
+            "douyin_relaxed": douyin_relaxed,
+            "seo_pages": seo_pages,
             "keep_seek": bool(args.keep_seek),
             "merged_same_url": merged_same_url,
             "heat_sorted": True,
@@ -486,7 +557,8 @@ def main():
           f"(time_dist={time_distribution}, excluded_old={excluded_old}, "
           f"filtered_no_entity={filtered_no_entity}, seek_posts={seek_posts}, "
           f"buy_sell_posts={buy_sell_posts}, merged_same_url={merged_same_url}, "
-          f"city_mismatch={city_mismatch}, listing_pages={listing_pages})")
+          f"city_mismatch={city_mismatch}, listing_pages={listing_pages}, "
+          f"douyin_relaxed={douyin_relaxed}, seo_pages={seo_pages})")
 
 
 if __name__ == "__main__":

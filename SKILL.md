@@ -19,9 +19,9 @@ A 小区综合了解 / B 推荐评价 / C 选址建议 / D 找转租房源 / E �
 
 诚实边界：只聚合公开口碑帖与转租帖；不爬贝壳/链家挂牌数据（反爬+判例风险），不做全网房源比价。报告仅为公开舆情聚合，不构成决策依据，无数据不等于安全。
 
-## 第 0 步：依赖探测（永远第一步，不可跳过）
+## 第 0 步：依赖探测（采集类工作流第一步）
 
-收到任何租房问题，先运行：
+**采集类工作流（意图 A/B/C/D）先运行**；意图 E（纯咨询，不采集）直接作答，不跑（避免无谓的真实网络探测等待）：
 
 ```bash
 python <skill>/scripts/check_deps.py
@@ -43,7 +43,7 @@ python <skill>/scripts/check_deps.py
 |---|---|
 | 标的 | 小区/公寓/中介/房东/片区名；没有则留空（意图 C/E 常见） |
 | 城市 | 缺失则按工作流规则一次性问齐 |
-| 标的类型 | 小区 / 中介 / 片区（超大片区走片区下钻） |
+| 标的类型 | 小区 / 中介 / 片区（超大片区且需子小区对比时走片区下钻，问整体直接搜关键词） |
 | 关注点 | 从原话提取：推荐 / 价格 / 二房东 / 转租 / 噪音 / 押金 / 靠谱 等 |
 | 约束 | 预算 / 通勤 / 合租整租 / 时间窗 |
 
@@ -64,24 +64,24 @@ python <skill>/scripts/check_deps.py
 - 判断不了就用一句话向用户澄清再路由。
 - 复合问题（"住哪好+有没有转租"）拆成多次路由依次执行。
 - 意图 B 为多标的对比（"A 和 B 哪个好"）时：逐个标的按工作流 A 完整采集分析，再合并对比给结论（见工作流 B）。
-- 意图 B 输入为超大片区时，自动转入下方"片区下钻推荐"流程（意图 A 同样适用）。
+- 意图 A/B 输入为超大片区、**且问题本身需要子小区粒度对比**（"哪个区合适""本区和东区比"）时，才转入下方"片区下钻推荐"；问整体口碑/避坑/价格时直接按普通标的采集——搜索词就是「标的+场景词」现场组合（如"天通苑 避坑"），帖内自然携带子区信息，分析时按子区归类呈现即可，**不强制下钻**。
 - 触发词参考：租房避坑/踩坑/口碑/推荐租吗/住哪合适/选址/转租/直租/合租/押金/合同/房东/中介。
 
-## 片区下钻推荐（意图 A/B 输入为超大片区时自动触发）
+## 片区下钻推荐（仅当问题需要子小区粒度时触发，不默认）
 
-超大片区（如天通苑）整体口碑帖无法区分各分区差异，必须拆成子小区逐个对比，才能回答用户"住哪个区合适"的问题。
+超大片区（如天通苑）的整体口碑帖不区分分区差异。**只有当用户的问题需要子小区粒度**（"住哪个区合适""A 区和 B 区比"）时才拆成子小区逐个对比；问"天通苑怎么样/避坑/多少钱"这类整体问题时，把片区名当普通标的、用「标的+场景词」直接在平台搜关键词即可，无需下钻。
 
 1. **片区规模判断**：收到小区/片区名后，先判断是 `具体小区` 还是 `超大片区`。
    - 依据：名称特征（"XX苑/XX镇/XX街道"等）且城市知识已知其含多个分区；由 LLM 自行判断，**拿不准时先问用户一句**再继续。
    - 超大片区示例：北京天通苑（含本 1-6 区、东 1-3 区、西 1-3 区、北 1-2 区等）、回龙观、望京；上海康城。
-   - 具体小区 → 照常走工作流 A/B；超大片区 → 走下钻流程。
+   - 具体小区 → 照常走工作流 A/B；超大片区且问题需子小区粒度 → 走下钻；超大片区但问整体 → 照常走 A/B。
 2. **下钻流程**：
    - **枚举子小区清单**：用 LLM 城市知识列出，再按用户需求（预算/通勤/合租整租）筛选；超过 8 个时先让用户选，或按需求砍到 4-6 个。
-   - **逐子小区轻量采集**：每个子小区只跑 xhs + web 两源，query 按动态规则组合（`{子小区名} 租房`，用户有关注点则换成对应场景词），直跑单脚本 `--limit 10 --days 180 --sort discussion,hot`（如 `python <skill>/scripts/collect_xhs.py --query "天通苑本三区 租房" --limit 10 --days 180 --sort discussion,hot`，collect_web.py 同参；走编排器则 `run_collect.py --target 10 --platforms "xhs,web"`）。
+   - **逐子小区轻量采集**：每个子小区跑 xhs + web + douyin 三源，query 按动态规则组合（`{子小区名} 租房`，用户有关注点则换成对应场景词），直跑单脚本 `--limit 10 --days 180 --sort discussion,hot`（如 `python <skill>/scripts/collect_xhs.py --query "天通苑本三区 租房" --limit 10 --days 180 --sort discussion,hot`，collect_web.py / collect_douyin.py 同参；走编排器则 `run_collect.py --target 10 --platforms "xhs,web,douyin"`）。
    - **合并清洗**：逐子小区调用 `python <skill>/scripts/clean.py --query <子小区名>`（如 `--query "天通苑本三区"`），产出各自 `<data>/cleaned/<子小区>.json` 后合并进同一次分析。
    - **语义分析（Claude）**：写 `mode = "locate"` 的 analysis.json，`target.type = "片区"`；`candidates` 每个子小区一条（name/pros/cons/commute，commute 在 M3 前用文本描述并标注"文本估算"）；`findings` 同时保留片区级共性风险（如天通苑的二房东问题）。
    - **渲染与结论**：render.py 出子小区对比报告；`verdict` 用 2-3 句话给出"哪个子小区更适合你"的结论及理由，并在回复里复述。
-3. **频控**：子小区采集同样每源 ≤10 帖、脚本内随机间隔 sleep、7 天内复用缓存；单次任务上限 = 4-6 个子小区 × 2 平台，超出先砍清单、不加采集。
+3. **频控**：子小区采集同样每源 ≤10 帖、脚本内随机间隔 sleep、7 天内复用缓存；单次任务上限 = 4-6 个子小区 × 3 平台，超出先砍清单、不加采集。
 4. **降级**：某子小区搜不到数据 → 该条 candidates 的 cons 写"舆情数据不足，需实地核验"，禁止编造 pros/cons。
 
 ## 工作流 A：小区综合了解（意图 B/C 复用）
@@ -101,7 +101,7 @@ python <skill>/scripts/check_deps.py
    - 轻量 **60 条 ≈ 20 分钟**（--target 60）
    - 标准 **150 条 ≈ 1 小时**（--target 150）
    - 深度 **300 条 ≈ 2 小时+**（--target 300）
-   耗时依据实测约 2.5 条/分钟/平台（串行）；加 `--parallel` 四平台并行约减半。用户不选就默认标准档。
+   耗时依据实测约 2.5 条/分钟/平台（串行）；加 `--parallel` 四平台并行约减半。用户不选就默认标准档。**前端衔接**：若门面页（8770，serve_home.py）正在跑，用户可直接在页面上选量级（提交文本自动带"【量级：X】"标注）；否则 Claude 问量级时顺带提示一句"想要浏览器/手机页面提交，可跑 `python <skill>/scripts/serve_home.py`"。
 4. **批次采集（一条 run_collect 命令，编排器自动多轮累计；脚本内部请求间隔随机、批间休眠 10-30s；评论一律按点赞最热排序取 top；时间窗与排序按下方硬规则传参）**：
 
    ```bash
@@ -120,7 +120,13 @@ python <skill>/scripts/check_deps.py
    **采集后健康检查（必做）**：读 run_collect stdout 末尾 `[汇总]` 行（总量、当日去重新增、summary 与账本路径），必要时读 progress/<slug>.summary.json 里各平台条数与失败/降级组合；并核对 cleaned 数据中 `note_fetch_failed` / `comments_fetch_failed` 标记占比：任一占比 ≥50% → 视为该源本轮失败，按降级规则处理（跳过该源、在 `coverage.note` 说明），不基于残缺数据下结论。
 5. **清洗**：`python <skill>/scripts/clean.py --query <标的>` → 产出 `<data>/cleaned/<标的>.json`（去重、广告过滤、求租帖剔除、8 类风险粗分类、房源帖识别、评论取 top）。
 6. **媒体处理（用户 2026-08-15 定：小红书不读图）**：xhs 以正文+评论为主，**不默认下载图片识别**；fetch_media.py 保留为可选工具，仅在用户点名"看看帖子里的图"时使用（`--note-ids "id1,id2"` 或完整 URL）。
-7. **抖音视频口播转写**：采集命令加 `--get-video N`（N≤3，对讨论 top 视频帖：MediaCrawler 下载→ffmpeg 抽音频→sherpa-onnx+SenseVoice 本地转写→文本以"【口播转写】"并入该帖 content，extra.asr=true）。注意：MediaCrawler 开视频后会下载搜索页全部结果，**--get-video 务必配小 limit（如 --limit 3）**控带宽。运行时装于 <tools>/asr-venv + models（缺依赖时脚本 exit 3 给指引）；手动转写单文件用 `python <skill>/scripts/asr.py --video <文件>`。
+7. **抖音视频口播转写（默认执行，抖音源的核心价值在口播内容）**：主批次（含 `--parallel`）跑完后，**默认追加一条独立小量命令**单独跑（`--get-video` 与 `--parallel` 互斥，必须后置单跑）：
+
+   ```bash
+   python <skill>/scripts/collect_douyin.py --query "<主查询词>" --limit 3 --get-video 2 --top-comments 10 --days 180 --sort discussion,hot
+   ```
+
+   （N≤3，对讨论 top 视频帖：MediaCrawler 下载→ffmpeg 抽音频→sherpa-onnx+SenseVoice 本地转写→文本以"【口播转写】"并入该帖 content，extra.asr=true）。**带宽铁律：limit 必须小**——MediaCrawler 开视频后会下载搜索页全部结果，`--get-video` 务必配 `--limit 3` 级别控带宽。用户明说"不要转写/不用视频"才跳过。频控口径不变（≤3 帖）。运行时装于 <tools>/asr-venv + models（缺依赖时脚本 exit 3 给指引）；手动转写单文件用 `python <skill>/scripts/asr.py --video <文件>`。
 8. **语义分析（Claude 亲自做，只读 <data>/cleaned/*.json）**：首要任务是**回答用户提出的那个问题**：用户问推荐就给推荐结论，问价格就汇总价格锚点，问二房东就查二房东证据。references/risk-signals.md 的风险八维只作为组织发现的分类词汇表（复核 clean.py 粗分类、剔除否定语境误命中如"从来没漏过水"），不是分析的目的。按下方 schema 写出 `<data>/analysis/<标的>.json`（按标的命名，防多标的互相覆盖；schema 不变）。
 9. **渲染**：`python <skill>/scripts/render.py --analysis <data>/analysis/<标的>.json --cleaned <data>/cleaned/<标的>.json`（启用地理层时再加 `--geo <data>/geo/<标的>.json`）→ `<data>/reports/<标的>_<YYYYMMDD>.html`。最后告知用户报告绝对路径，并给一句话结论。
 
@@ -137,7 +143,7 @@ python <skill>/scripts/check_deps.py
 
 1. **信息确认**：工作地（地标/地铁站）、预算、可接受通勤时长、其他要求（合租/整租、电梯房等），缺则一次问齐。
 2. **候选片区生成**：用 LLM 自身城市知识产出 3-5 个候选片区（预算匹配、通勤可达、租赁供给充足），每个附一句话理由，明示这是经验推断。
-3. **逐片区跑工作流 A 轻量版**：搜索词按动态规则组合（`{片区} 怎么样`、`{片区} 住过` 等评价视角词优先，"租房"泛词不单独用）1-2 组，每片区一条小量编排：`python <skill>/scripts/run_collect.py --target 10 --queries "{片区}怎么样,{片区}住过" --platforms "xhs,douban,web" --days 180 --sort "discussion,hot"`（不跑 12315）。
+3. **逐片区跑工作流 A 轻量版**：搜索词按动态规则组合（`{片区} 怎么样`、`{片区} 住过` 等评价视角词优先，"租房"泛词不单独用）1-2 组，每片区一条小量编排：`python <skill>/scripts/run_collect.py --target 10 --queries "{片区}怎么样,{片区}住过" --platforms "xhs,web,douyin" --days 180 --sort "discussion,hot"`（不跑 12315；豆瓣对小片区命中率低，不默认参与选址，用户点名可加回 --platforms）。
 4. **通勤分析**：M3 之前用文本描述（如"国贸→天通苑：5号线转1号线约40分钟"）并标注"文本估算"；M3 之后调用 `geocode.py` 路线接口取实测数据。
 5. 汇总写 `mode = "locate"` 的 analysis.json（candidates 数组：每片区 pros/cons/commute + 口碑风险摘要）→ render → 输出片区对比排名 + 适合人群 + 提醒实地看房。
 
@@ -176,10 +182,10 @@ python <skill>/scripts/check_deps.py
    python <skill>/scripts/geocode.py geocode "天通苑" --city 北京            # 定位
    python <skill>/scripts/geocode.py around "116.42,40.07" --city 北京     # 周边 8 组配套各取最近 3
    python <skill>/scripts/geocode.py around "116.42,40.07" --city 北京 --custom "健身房"   # 按需自定义关键词，取最近 5
-   python <skill>/scripts/geocode.py route "天通苑" "国贸" --city 北京      # 通勤测算（--mode transit|walking|riding），仅当用户提供了通勤目的地
+   python <skill>/scripts/geocode.py route "天通苑地铁站" "国贸地铁站" --city 北京      # 通勤测算（--mode transit|walking|riding），仅当用户提供了通勤目的地
    ```
 
-   around 的 target 直接用 geocode 返回的 location；route 的起点=标的、终点=用户提供的通勤目的地（用户没给就不跑 route）。noise 命令保留但默认不跑：仅用户主动问噪音时执行 `python <skill>/scripts/geocode.py noise <坐标> --city <城市>`。
+   around 的 target 直接用 geocode 返回的 location；route 的起点=标的、终点=用户提供的通勤目的地（用户没给就不跑 route）。**起终点地名后缀『地铁站』更稳**：高德对裸小片区名常解析失败（报 30001，如"马连洼"会被误解析成"西苑"），加"地铁站"后缀即通；geocode 定位同理。noise 命令保留但默认不跑：仅用户主动问噪音时执行 `python <skill>/scripts/geocode.py noise <坐标> --city <城市>`。
 2. **主动问通勤（交互）**：意图 A/B 在输入解析时顺带问一句"上班地点/通勤目的地是哪？"（用户可拒绝；仅当标的为小区/片区时问，中介/房东人名标的不问）。用户给了 → 跑 route（起点=标的、终点=该地点），geo.json 写 route 段，模板自动画通勤虚线+摘要；拒绝或没有 → 跳过 route，不追问。报告出来后用户补充工作地也一样补跑。
 3. **按需周边查询（交互）**：用户问"附近有没有大超市/医院/健身房"这类配套 → 直接跑 `python <skill>/scripts/geocode.py around <坐标> --city <城市> --custom "超市"`（--custom 单独给定时只查该关键词不查预置 8 组，省配额；逗号可分隔多个）→ **先用文字直接回答**（名称+距离，取最近 5），同时把返回的 group（group 名=关键词）追加进 geo.json 的 around.groups（见第 5 条），重跑 render 后地图上以灰点可视化。
 4. **组装** `<data>/geo/<标的>.json`：四段输出拼成 `{"geocode":{location,formatted_address,city},"around":{"radius_m":1500,"groups":[{group,pois:[{name,distance_m,address,location}]}]},"noise":{"total":0,"hits":[{type,name,distance_m,address,location}]},"route":{mode,summary,distance_m,duration_min,transfers,origin_location,dest_location}}`，可参照 `<data>/geo/` 下已有 geo 文件（如有）。
@@ -214,7 +220,7 @@ python <skill>/scripts/check_deps.py
 - `coverage` 记各平台清洗后有效帖数；降级/跳源的写进 `note`。
 - `verdict` 仅 recommend/locate 模式必填；`listings`/`candidates` 分别为意图 D/C 必填；`candidates` 每条带 `evidence`（一句话来源线索）。
 - `positive` 为好评精选 8-10 条（不足时如实少给，禁止编造）；`suggestions` 3-8 条；均需有 cleaned 数据或 checklist 依据。
-- faq 模式（意图 E）不采集不清洗：只填 question/sections/risk_notes/action_checklist（见工作流 E），coverage 等字段留空。
+- faq 模式（意图 E）不采集不清洗：只填 question/sections/risk_notes/action_checklist（见工作流 E），coverage 等字段留空；无标的的 FAQ 可**整体省略 `target`**（或 type 填"咨询"），渲染层已容错。
 - **禁止捏造通勤**：仅当用户明确给出上班地/通勤目的地才做通勤分析与地图画线，绝不假设、绝不替用户编工作地。用户提供了就在 coverage.note 写明「通勤目的地：X」，报告模板据此才渲染通勤块并画线；未提供时 geo.json 里残留的 route 数据不展示、不参与结论。
 - **默认不做周边噪音查询**：地理层默认只跑 geocode + around 配套查询；noise 仅用户主动问噪音时单独跑（geocode.py 的 noise 能力保留），geo.json 默认不含 noise 段，报告默认无噪音区块。
 - **报告内容矩阵（报告是全屏卡片左右翻页；分析层按此组织字段，第一卡永远是用户问题的直接答案）**：
@@ -240,7 +246,7 @@ python <skill>/scripts/check_deps.py
 | 意图 | 各源下限 |
 |---|---|
 | A/B | xhs ≥20、douban ≥10、web ≥10、douyin ≥15 |
-| C | 每片区 xhs ≥10、web ≥10 |
+| C | 每片区三源（xhs/web/douyin）合计 ≥10 条（与工作流 C 示例 `--target 10` 同口径）；不足在 coverage.note 说明并降 confidence |
 | D | douban ≥10、xhs ≥10 |
 
 不达标处置（依次）：
@@ -286,7 +292,7 @@ python <skill>/scripts/check_deps.py
 - **用户入口 = 双击启动 bat（开发机为 `E:\租房\启动租房助手.bat`；他机自建 bat 跑 `python <skill>/scripts/serve_home.py`，可用 RENT_ASSIST_WORK_DIR 指定 claude 工作目录）**：起本地服务（8770；默认绑 0.0.0.0，手机同 WiFi 可访问，设 RENT_ASSIST_BIND=127.0.0.1 可仅本机）并自动打开浏览器门面页（templates/landing.html，蓝白风+SVG楼群动画，手机/桌面双端适配）。
 - 门面页输入任意租房需求 → 点"开始查询" → 服务拉起新终端窗口跑 `claude "<需求>"`（在项目目录内跑，权限生效；量级菜单等交互在该终端里完成）→ 服务每 5s 盯 data/reports，新报告生成后页面自动弹出。
 - **历史报告与报告列表**：门面页有"历史报告"入口，或直接访问 `http://<主机>:8770/reports/`（索引页，mtime 倒序）；inbox 收到非租房输入时用 `scripts/out_of_scope.py` 生成范围外说明回传手机。
-- 没起服务时直接双击打开 landing.html 会自动降级为"复制提问"模式（零后端可用）。
+- 没起服务时直接双击打开 landing.html 会自动降级为"复制提问"模式（零后端可用）。**会话衔接**：Claude 在会话里问量级等交互信息时，若门面页未跑，顺带提示用户可用 serve_home.py 起浏览器/手机页提交（见工作流 A 第 3 步）；页面提交的文本自带"【量级：X】"标注，Claude 据此直接定档，不再重复追问。
 - **报告模板改版纪律**：改 templates/report.html.j2 前先跑 `python <skill>/scripts/test_render_check.py` 记基线，改完再跑（不变量：新模板不得丢失旧模板已展示字段）；视觉验证用 Playwright 375/1280 截图。
 
 raw jsonl 每行 schema：`{"platform","query","collected_at","url","title","content"(≤2000字),"author","published_at","likes","comments_count","comments":[{"text","likes","author"}],"extra":{}}`（xhs 源的 extra 含 `note_type: video|image|unknown`）。

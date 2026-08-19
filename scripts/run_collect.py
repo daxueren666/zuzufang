@@ -432,9 +432,12 @@ def run_parallel(args, platforms, slug, out_dir, progress_dir, queries, extras):
     share = platform_shares(platforms, args.target, args.per_platform)
     print("[run_collect] 并行模式：每平台一个 worker（同平台内仍串行批次+随机间隔，"
           "频控不变；并行只发生在不同平台间）")
-    print("[run_collect] 标的=%s 平台=%s 配额=%s worker目录=%s" % (
+    print("[run_collect] 标的=%s 平台=%s 配额=%s worker目录=%s%s" % (
         slug, ",".join(platforms),
-        "/".join(str(share[p]) for p in platforms), run_dir))
+        "/".join(str(share[p]) for p in platforms), run_dir,
+        "（min兜底已夹紧=%d：原 --min-per-platform=%d 超过配额，不突破用户上限）"
+        % (min(args.min_per_platform, min(share.values())), args.min_per_platform)
+        if args.min_per_platform > min(share.values()) else ""))
     started_at = now_iso()
     t0 = time.monotonic()
     procs, log_fhs = {}, {}
@@ -648,6 +651,22 @@ def platform_shares(platforms, target, per_platform):
     return {p: max(1, math.ceil(target / len(platforms))) for p in platforms}
 
 
+def effective_min(min_per_platform, per_platform, shares):
+    """--min-per-platform 兜底值与用户显式上限的夹紧（#8）。
+
+    用户上限 = --per-platform；未配时 = --target 折算出的每平台配额
+    （各平台配额的最小值）。min 超过上限会被夹到上限，保证编排器绝不
+    为凑保底值突破用户显式给的量级（如用户每平台 5 条，min 默认 20）。
+    """
+    if per_platform is not None:
+        cap = int(per_platform)
+    elif shares:
+        cap = min(int(s) for s in shares)
+    else:
+        return min_per_platform
+    return min(min_per_platform, cap)
+
+
 def load_queries(args):
     qs = split_list(args.queries)
     if args.query_file:
@@ -743,10 +762,10 @@ def main():
     summary_path = progress_dir / (slug + ".summary.json")
 
     share = platform_shares(platforms, args.target, args.per_platform)
-    # --per-platform 模式下最低兜底不超过配额（否则会为凑 min 空跑备用查询）
-    min_pp = args.min_per_platform
-    if args.per_platform is not None:
-        min_pp = min(min_pp, args.per_platform)
+    # --min-per-platform 兜底不突破用户显式上限（--per-platform 或 --target
+    # 折算的每平台配额），否则会为凑 min 空跑备用查询甚至突破用户量级（#8）
+    min_pp = effective_min(args.min_per_platform, args.per_platform,
+                           [share[p] for p in platforms])
 
     # 去重基线：近 7 天已有 jsonl（仅本次查询集）∪ 账本哈希；取大者为各平台累计起点
     url_sets, pair_urls, files = scan_recent_urls(out_dir, platforms,
@@ -790,13 +809,17 @@ def main():
     main_reuse = sum(1 for (p, q) in reuse_skipped if q in qset_main)
     skipped = total_pairs - len(queue) - main_reuse
 
-    print("[run_collect] 标的=%s %s 平台=%s 配额=%s 单批=%d days=%d sort=%s" % (
+    print("[run_collect] 标的=%s %s 平台=%s 配额=%s 单批=%d days=%d sort=%s"
+          " min兜底=%d%s" % (
         slug,
         "每平台上限=%d" % args.per_platform if args.per_platform is not None
         else "目标=%d" % args.target,
         ",".join(platforms),
         "/".join(str(share[p]) for p in platforms),
-        args.batch_limit, args.days, args.sort or "(子脚本默认)"))
+        args.batch_limit, args.days, args.sort or "(子脚本默认)",
+        min_pp,
+        "（已夹紧：原 --min-per-platform=%d 超过用户上限，不突破）"
+        % args.min_per_platform if min_pp != args.min_per_platform else ""))
     print("[run_collect] 组合 %d 个（%d 查询 × %d 平台），账本跳过 %d，复用跳过 %d，"
           "待跑 %d；备用查询 %d 个" % (
               total_pairs, len(queries), len(platforms), skipped,

@@ -594,6 +594,16 @@ def convert_rows(content_rows, comment_rows, keywords, top_comments, query,
     return records, win_stats
 
 
+def truncate_limit(records, limit):
+    """按 --limit 硬截断（#16）：MediaCrawler 按页抓、limit 非硬顶，实际条数
+    常超（如 limit 5 实抓 12-14）。records 已是 convert_rows 排序后的顺序，
+    截前保序（排序语义不变）。返回 (截断后列表, 丢弃条数)。"""
+    limit = int(limit or 0)
+    if limit > 0 and len(records) > limit:
+        return records[:limit], len(records) - limit
+    return records, 0
+
+
 # ---------------------------------------------------------------- 主流程
 
 def main():
@@ -680,9 +690,12 @@ def main():
                 print("[douyin] 警告: base_config.py 未找到 'ENABLE_GET_MEIDAS = False'"
                       " 行（可能已 True 或项目改名），按现状跑。", file=sys.stderr)
 
-    per_post = min(max(args.top_comments * PER_POST_COMMENT_FETCH, 20), 100)
-    print("[douyin] 启动 MediaCrawler（limit=%d，每帖抓评 %d 条，超时 %ds）..."
-          % (args.limit, per_post, args.timeout))
+    # MediaCrawler 按页抓、limit 非硬顶：每帖抓评量随 --top-comments 自适应
+    # （旧地板值 20 会让 top-comments=5 时日志显示"每帖抓评 20 条"，被误读为
+    # 未透传；实际保留条数仍由 convert_rows 按 top_comments 截），下限 10 保底
+    per_post = min(max(args.top_comments * PER_POST_COMMENT_FETCH, 10), 100)
+    print("[douyin] 启动 MediaCrawler（limit=%d，每帖抓评 %d 条（保留 top %d），超时 %ds）..."
+          % (args.limit, per_post, args.top_comments, args.timeout))
     try:
         rc, tail = run_mediacrawler(vpy, args.mc_dir, keywords,
                                     max(1, args.limit), per_post)
@@ -709,6 +722,12 @@ def main():
                   args.days, win_kept, win_dropped, win_unknown), file=sys.stderr)
         sys.exit(2)
 
+    records, truncated = truncate_limit(records, args.limit)
+    if truncated:
+        print("[douyin] MediaCrawler 按页抓取超出 --limit=%d，已按排序截断："
+              "%d → %d（丢弃 %d 条）"
+              % (args.limit, len(records) + truncated, len(records), truncated))
+
     asr_done = 0
     if args.get_video > 0:
         asr_done = attach_spoken_text(records, args.get_video, args.mc_dir,
@@ -718,10 +737,11 @@ def main():
     with path.open("a", encoding="utf-8") as f:
         for rec in records:
             f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    print("platform=%s fetched=%d %s %s%s file=%s" % (
+    print("platform=%s fetched=%d %s %s%s%s file=%s" % (
         PLATFORM, len(records), ac.sort_seg(args.sort),
         window_stat_seg(args.days, win_kept, win_dropped, win_unknown),
         " asr=%d/%d" % (asr_done, args.get_video) if args.get_video else "",
+        " trunc=%d(限--limit=%d)" % (truncated, args.limit) if truncated else "",
         path.name))
     sys.exit(0)
 

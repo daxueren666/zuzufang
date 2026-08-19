@@ -101,6 +101,21 @@
 
   .hintline{margin:11px 2px 0;min-height:19px;font-size:12.5px;color:var(--fg2);
     transition:color 1.2s ease}
+
+  /* 量级三档 pill：贴蓝白设计语言 */
+  .lvrow{display:flex;gap:8px;max-width:560px;margin-top:16px}
+  .lv{flex:1;min-width:0;border:1px solid var(--cbbr);background:var(--cbbg);
+    border-radius:999px;padding:9px 4px 8px;text-align:center;cursor:pointer;
+    color:var(--fg2);transition:background .2s ease,border-color .2s ease,color .2s ease,box-shadow .2s ease}
+  .lv b{display:block;font-size:13.5px;font-weight:600;color:var(--fg);transition:color .2s ease}
+  .lv small{display:block;font-size:11px;line-height:1.5;margin-top:1px}
+  .lv:hover{border-color:var(--accent)}
+  .lv.on{background:var(--accent);border-color:var(--accent);color:rgba(255,255,255,.82);
+    box-shadow:var(--shadow-g)}
+  .lv.on b{color:#fff}
+  .lv.on small{color:rgba(255,255,255,.82)}
+  .lv:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  .lvlab{margin:14px 2px 0;font-size:12.5px;color:var(--fg2);max-width:560px}
   .replink{display:inline-block;margin:12px 2px 0;font-size:12.5px;color:var(--fg2);
     text-decoration:underline;text-decoration-color:transparent;text-underline-offset:4px;
     transition:color .2s ease,text-decoration-color .2s ease}
@@ -284,7 +299,7 @@
     100%{opacity:0;transform:translate(-175px,98px)}}
 
   /* ---------- 提交转场三拍 ---------- */
-  .stage.t1 :is(.askrow,.hintline,.copybox){animation:collOut .4s cubic-bezier(.4,0,.7,.2) forwards}
+  .stage.t1 :is(.askrow,.lvlab,.lvrow,.hintline,.copybox){animation:collOut .4s cubic-bezier(.4,0,.7,.2) forwards}
   @keyframes collOut{to{opacity:0;transform:translateY(12px) scale(.95);visibility:hidden}}
   .stage.t2 .hero-title{animation:riseOut .55s cubic-bezier(.33,.7,.3,1) forwards}
   .stage.t2 .hero-sub{animation:riseOut .55s .07s cubic-bezier(.33,.7,.3,1) forwards}
@@ -341,6 +356,12 @@
           </svg>
         </button>
       </form>
+      <p class="lvlab">采集量级（不选默认标准）：</p>
+      <div class="lvrow" id="lvrow" role="group" aria-label="采集量级">
+        <button class="lv" type="button" data-tag="轻量 60 条">轻量<b>60 条</b><small>约 20 分钟</small></button>
+        <button class="lv on" type="button" data-tag="标准 150 条">标准<b>150 条</b><small>约 1 小时</small></button>
+        <button class="lv" type="button" data-tag="深度 300 条">深度<b>300 条</b><small>约 2 小时</small></button>
+      </div>
       <p class="hintline" id="hintline" role="status"></p>
       <a class="replink" id="replink" href="/reports/">历史报告</a>
       <div class="copybox" id="copybox" hidden></div>
@@ -728,6 +749,14 @@ function copyFlow(text){
   });
 }
 
+/* ---------------- 量级三档 pill ---------------- */
+var lvTag='标准 150 条';
+$('lvrow').addEventListener('click',function(e){
+  var b=e.target.closest('.lv');if(!b)return;
+  this.querySelectorAll('.lv').forEach(function(x){x.classList.remove('on');});
+  b.classList.add('on');lvTag=b.getAttribute('data-tag');
+});
+
 /* ---------------- 提交 ---------------- */
 var form=$('askForm'),input=$('need'),go=$('go');
 var goHTML=go.innerHTML;
@@ -739,6 +768,7 @@ form.addEventListener('submit',function(e){e.preventDefault();send();});
 function send(){
   var text=input.value.trim();
   if(!text){input.focus();return;}
+  text=text+'【量级：'+lvTag+'】';   /* 前端拼文本，不改提交协议，队列/拉终端两模式均生效 */
   if(!online){input.value='';copyFlow(text);return;}   /* 离线：不转场，留在首页 */
   go.disabled=true;
   fetch('/run',{

@@ -2,7 +2,7 @@
 
 Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社交媒体来找租房攻略和信息，但是这些信息又都散落在各个平台里面。所以我索性做了这个 skill：你输入需求，skill 帮你收集真实的用户讨论和房源信息，再也不用各个平台来回跑，最后还给你一份详细的租房报告，手机端电脑端都能查看。
 
-![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![PolyForm NC](https://img.shields.io/badge/license-PolyForm%20NC-orange) ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
+![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![PolyForm NC](https://img.shields.io/badge/license-PolyForm%20NC-orange) ![Python](https://img.shields.io/badge/python-3.10+-blueviolet)
 
 ![门面页](docs/landing-desktop.png)
 
@@ -22,6 +22,8 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 
 2019 年的好评压不过 2026 年的差评：老帖自动降权，每条证据都标发布时间。
 
+尽调/口碑/选址类问题默认采集小红书、豆瓣、网页、抖音四平台（选址以小红书+网页+抖音为主，豆瓣对小片区命中率低不默认参与；找房以豆瓣+小红书为主——均可按需加平台）。抖音视频默认自动转写口播内容进分析。
+
 ## 装好后怎么用
 
 打开你的 AI 助手（如果它没认出这个技能，重启一次让它重新加载），直接说人话。它会追问缺的信息（城市、预算、量级），确认后开始采集分析：
@@ -36,7 +38,7 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 
 | 功能 | 需要准备 | 一次性操作 |
 |---|---|---|
-| 基础（采集/清洗/报告） | Python 3.11+（终端跑 `python --version` 确认）；一个能在终端里执行命令的 AI 助手，如 [Claude Code](https://claude.com/claude-code) 或 [Codex CLI](https://github.com/openai/codex) | — |
+| 基础（采集/清洗/报告） | Python 3.10+（终端跑 `python --version` 确认）；一个能在终端里执行命令的 AI 助手，如 [Claude Code](https://claude.com/claude-code) 或 [Codex CLI](https://github.com/openai/codex) | — |
 | 小红书源 | Chrome 浏览器 | 装好 Agent-Reach 与 Chrome 扩展后扫码登录一次（命令见下） |
 | 豆瓣源 | — | 首次采集会弹浏览器，登录一次 |
 | 抖音源 | — | 首次采集用抖音 App 扫码一次 |
@@ -113,6 +115,8 @@ python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 - Claude Code：`~/.claude/skills/`（Windows：`%USERPROFILE%\.claude\skills\`）
 - Codex CLI：`~/.codex/skills/`
 - 其他 agent（Gemini CLI、Cursor 等）：一般在其配置目录下的 `skills/` 文件夹，技能格式通用
+
+**从旧版升级**：先把旧目录整体移出 skills 目录（或删掉）再 clone 新版——留在同级的旧版备份会被识别成重复技能，可能导致触发混乱。
 
 ## 可选配置
 

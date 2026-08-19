@@ -1,8 +1,9 @@
-# rent-assist 运行依赖（clean.py 仅用标准库；collect/render 需以下包）
+# rent-assist runtime dependencies (clean.py uses stdlib only; collect/render need the packages below)
 requests
 jinja2
-pillow         # fetch_media.py 图片压缩（长边<=1024 JPEG q82）
+pillow         # fetch_media.py image compression (long edge <=1024, JPEG q82)
 
-# 可选：
-# playwright   # 豆瓣兜底渲染抓取（collect_douban 降级方案）
-# 视频转写不用 funasr：sherpa-onnx 装在独立 venv <tools>\asr-venv（不入本文件；asr.py 缺依赖时 exit 3 给指引）
+# Optional:
+# playwright   # Douban fallback rendering (collect_douban degraded mode)
+# Video transcription does not use funasr: sherpa-onnx lives in a separate venv <tools>\asr-venv
+#              (not listed here; asr.py exits 3 with setup guide if deps are missing)
