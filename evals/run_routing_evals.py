@@ -27,7 +27,7 @@ EXPECTED = {
     3:  {"intent": "C", "compound": None, "gates": {}},
     4:  {"intent": "D", "compound": None, "gates": {}},
     5:  {"intent": "E", "compound": None, "gates": {}},
-    6:  {"intent": "A_DRILLDOWN", "compound": None, "gates": {}},
+    6:  {"intent": "A", "compound": None, "gates": {}},
     7:  {"intent": "B_DRILLDOWN", "compound": None, "gates": {}},
     8:  {"intent": "ASK_CITY", "compound": None, "gates": {}},
     9:  {"intent": "C+D", "compound": ["C", "D"], "gates": {}},
@@ -41,6 +41,7 @@ EXPECTED = {
          "gates": {"commute": "closed"}},
     17: {"intent": "A", "compound": None,
          "gates": {"noise": "open"}},
+    18: {"intent": "A", "compound": None, "gates": {}},
 }
 
 # 超大片区词表（模拟 SKILL.md 的超大片区判断）
@@ -103,8 +104,8 @@ def classify(text: str) -> str:
     if re.search(r"找个一居室|直租|个人转租|房源|女生合租", text):
         return "D"
 
-    # A_DRILLDOWN：超大片区综合了解
-    if re.search(r"|".join(MEGA_AREAS), text) and re.search(r"怎么样", text):
+    # A_DRILLDOWN：超大片区且问题需要子小区粒度（收窄后：整体问法不下钻）
+    if re.search(r"|".join(MEGA_AREAS), text) and re.search(r"住哪个|哪个区合适|子小区|本区.*东区|东区.*本区", text):
         return "A_DRILLDOWN"
 
     # A_ASK_INFO：房东/中介人名标的，信息过泛需反问
@@ -115,6 +116,11 @@ def classify(text: str) -> str:
     if re.search(r"怎么样|咋样|靠谱吗|坑点|吵不吵", text):
         if city is None and re.search(r"阳光小区|康城", text):
             return "ASK_CITY"
+        return "A"
+
+    # A 兜底：用户点名地名+租房类泛词（无 C/D 问句）——"海淀永丰租房"这类
+    # 直接当片区标的走 A，禁止滑向 C 生成候选片区
+    if city is not None and re.search(r"租房|房租|贵不贵", text):
         return "A"
 
     return "UNKNOWN"
@@ -160,7 +166,7 @@ def run():
         if not ok:
             failed.append(eid)
     print(f"通过 {passed}/{total}（自动化部分：每条路由 5 分，共 {total*5} 分；"
-          f"五元组 5 字段各 1 分（{total*5} 分）留人工/LLM 判，合计 170 分制）")
+          f"五元组 5 字段各 1 分（{total*5} 分）留人工/LLM 判，合计 {total*10} 分制）")
     if failed:
         print("失败用例：", ", ".join(f"R{e:02d}" for e in failed))
         return 1

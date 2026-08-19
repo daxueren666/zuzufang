@@ -317,11 +317,15 @@ class Ledger(object):
 
 # ---------------------------------------------------------------- 子进程
 
-def run_one_batch(scripts_dir, platform, query, args):
-    """跑一次 collect_<platform>.py，返回 (rc, stdout, stderr, 耗时秒, cmd)。"""
+def run_one_batch(scripts_dir, platform, query, args, limit=None):
+    """跑一次 collect_<platform>.py，返回 (rc, stdout, stderr, 耗时秒, cmd)。
+
+    limit：本批 --limit（默认 args.batch_limit）。传"剩余配额"可实现钳位——
+    子脚本单批就只抓配额内的量，不再整页抓超额后靠停止线收场。"""
     script = Path(scripts_dir) / ("collect_%s.py" % platform)
     cmd = [sys.executable, str(script), "--query", query,
-           "--limit", str(args.batch_limit), "--out-dir", str(args.out_dir)]
+           "--limit", str(limit if limit is not None else args.batch_limit),
+           "--out-dir", str(args.out_dir)]
     if args.days > 0:
         cmd += ["--days", str(args.days)]
     if args.sort:
@@ -856,7 +860,13 @@ def main():
                         s += random.uniform(*SAME_PLATFORM_SLEEP)
                     time.sleep(s * args.sleep_scale)
                 batch_no += 1
-                rc, out, err, el, cmd = run_one_batch(args.scripts_dir, p, q, args)
+                # 配额钳位：剩余配额小于批次上限时，把剩余量直接作为本批 --limit
+                # （子脚本只抓配额内的量；并行 worker 走本函数同样生效）
+                remaining = share.get(p, 0) - collected.get(p, 0)
+                batch_lim = (max(1, min(args.batch_limit, remaining))
+                             if share.get(p) else args.batch_limit)
+                rc, out, err, el, cmd = run_one_batch(args.scripts_dir, p, q, args,
+                                                      limit=batch_lim)
                 m = re.search(r"fetched=(\d+)", out)
                 fetched = int(m.group(1)) if m else args.batch_limit
                 log_fh.write(
