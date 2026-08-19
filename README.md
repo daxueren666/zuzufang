@@ -2,7 +2,7 @@
 
 > 一个通用 Agent Skill：一句白话提问，它把公开口碑扒清楚，出一份带地图、能点回原帖的可视化报告。
 
-![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![MIT](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
+![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![PolyForm NC](https://img.shields.io/badge/license-PolyForm%20NC-orange) ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 
 ![门面页](docs/landing-desktop.png)
 
@@ -49,8 +49,8 @@ python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 
 ## 边界（必读）
 
-只聚合公开口碑帖：这是"舆情参考"，不是"官方结论"。**无数据 ≠ 安全**，报告不构成决策依据，看房前请按报告里的核对清单实地核验。定位为个人自用工具，请低频使用，禁止批量爬取。
+只聚合公开口碑帖：这是"舆情参考"，不是"官方结论"。**无数据 ≠ 安全**，报告不构成决策依据，看房前请按报告里的核对清单实地核验。定位为个人自用工具，请低频使用，禁止批量爬取。**本 skill 仅限个人使用，不允许商业使用。**
 
 ## License
 
-[MIT](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE)——个人使用免费，禁止商业使用。
