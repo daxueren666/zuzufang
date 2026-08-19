@@ -34,10 +34,10 @@
 
 ```bash
 # Windows
-git clone https://github.com/daxueren666/租租房 "%USERPROFILE%\.claude\skills\rent-assist"
+git clone https://github.com/daxueren666/zuzufang "%USERPROFILE%\.claude\skills\rent-assist"
 
 # macOS / Linux
-git clone https://github.com/daxueren666/租租房 ~/.claude/skills/rent-assist
+git clone https://github.com/daxueren666/zuzufang ~/.claude/skills/rent-assist
 
 pip install -r ~/.claude/skills/rent-assist/requirements.txt
 
