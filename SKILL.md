@@ -101,7 +101,7 @@ python <skill>/scripts/check_deps.py
    - 轻量 **60 条 ≈ 20 分钟**（--target 60）
    - 标准 **150 条 ≈ 1 小时**（--target 150）
    - 深度 **300 条 ≈ 2 小时+**（--target 300）
-   耗时依据实测约 2.5 条/分钟/平台（串行）；加 `--parallel` 四平台并行约减半。用户不选就默认标准档。**前端衔接**：若门面页（8770，serve_home.py）正在跑，用户可直接在页面上选量级（提交文本自动带"【量级：X】"标注）；否则 Claude 问量级时顺带提示一句"想要浏览器/手机页面提交，可跑 `python <skill>/scripts/serve_home.py`"。
+   耗时依据实测约 2.5 条/分钟/平台（串行）；加 `--parallel` 四平台并行约减半。用户不选就默认标准档。**前端衔接（主动拉起 + 队列直达闭环）**：量级确认前先探测门面页——`curl -s http://127.0.0.1:8770/ping` 返回 alive 即已在跑；没起则后台以直达模式启动 `RENT_ASSIST_INBOX=1 python <skill>/scripts/serve_home.py`（run_in_background，电脑浏览器自动弹出），**并挂 Monitor 接收队列**（touch `<data>/inbox/heartbeat` 起 5 秒心跳循环 + `tail -n 0 -f <data>/inbox/queue.jsonl`，队列每行即一条页面提交的命令，按本 skill 工作流处理）。把启动横幅里「手机访问(需同一WiFi): http://<局域网IP>:8770/」转述给用户。闭环保证：页面提交 → 本会话接收处理 → 报告落 `<data>/reports/` → serve_home 盯到新报告**自动在原页面弹出**（电脑/手机同享）。页面提交自带【量级：X】标注，Claude 不再重复追问量级；**勿重复启动**（8770 双实例会抢占端口），已在跑但无心跳则补挂 Monitor 即可。
 4. **批次采集（一条 run_collect 命令，编排器自动多轮累计；脚本内部请求间隔随机、批间休眠 10-30s；评论一律按点赞最热排序取 top；时间窗与排序按下方硬规则传参）**：
 
    ```bash
@@ -123,7 +123,7 @@ python <skill>/scripts/check_deps.py
 7. **抖音视频口播转写（默认执行，抖音源的核心价值在口播内容）**：主批次（含 `--parallel`）跑完后，**默认追加一条独立小量命令**单独跑（`--get-video` 与 `--parallel` 互斥，必须后置单跑）：
 
    ```bash
-   python <skill>/scripts/collect_douyin.py --query "<主查询词>" --limit 3 --get-video 2 --top-comments 10 --days 180 --sort discussion,hot
+   python <skill>/scripts/collect_douyin.py --query "<主查询词>" --limit 5 --get-video 3 --top-comments 10 --days 180 --sort discussion,hot
    ```
 
    （N≤3，对讨论 top 视频帖：MediaCrawler 下载→ffmpeg 抽音频→sherpa-onnx+SenseVoice 本地转写→文本以"【口播转写】"并入该帖 content，extra.asr=true）。**带宽铁律：limit 必须小**——MediaCrawler 开视频后会下载搜索页全部结果，`--get-video` 务必配 `--limit 3` 级别控带宽。用户明说"不要转写/不用视频"才跳过。频控口径不变（≤3 帖）。运行时装于 <tools>/asr-venv + models（缺依赖时脚本 exit 3 给指引）；手动转写单文件用 `python <skill>/scripts/asr.py --video <文件>`。
@@ -292,7 +292,7 @@ python <skill>/scripts/check_deps.py
 - **用户入口 = 双击启动 bat（开发机为 `E:\租房\启动租房助手.bat`；他机自建 bat 跑 `python <skill>/scripts/serve_home.py`，可用 RENT_ASSIST_WORK_DIR 指定 claude 工作目录）**：起本地服务（8770；默认绑 0.0.0.0，手机同 WiFi 可访问，设 RENT_ASSIST_BIND=127.0.0.1 可仅本机）并自动打开浏览器门面页（templates/landing.html，蓝白风+SVG楼群动画，手机/桌面双端适配）。
 - 门面页输入任意租房需求 → 点"开始查询" → 服务拉起新终端窗口跑 `claude "<需求>"`（在项目目录内跑，权限生效；量级菜单等交互在该终端里完成）→ 服务每 5s 盯 data/reports，新报告生成后页面自动弹出。
 - **历史报告与报告列表**：门面页有"历史报告"入口，或直接访问 `http://<主机>:8770/reports/`（索引页，mtime 倒序）；inbox 收到非租房输入时用 `scripts/out_of_scope.py` 生成范围外说明回传手机。
-- 没起服务时直接双击打开 landing.html 会自动降级为"复制提问"模式（零后端可用）。**会话衔接**：Claude 在会话里问量级等交互信息时，若门面页未跑，顺带提示用户可用 serve_home.py 起浏览器/手机页提交（见工作流 A 第 3 步）；页面提交的文本自带"【量级：X】"标注，Claude 据此直接定档，不再重复追问。
+- 没起服务时直接双击打开 landing.html 会自动降级为"复制提问"模式（零后端可用）。**会话衔接**：Claude 量级确认前**主动拉起门面页并挂队列接收**（探测→后台启动→Monitor 接收→报告原页自动弹出，完整规则见工作流 A 第 3 步「前端衔接」）；页面提交的文本自带"【量级：X】"标注，Claude 据此直接定档，不再重复追问。
 - **报告模板改版纪律**：改 templates/report.html.j2 前先跑 `python <skill>/scripts/test_render_check.py` 记基线，改完再跑（不变量：新模板不得丢失旧模板已展示字段）；视觉验证用 Playwright 375/1280 截图。
 
 raw jsonl 每行 schema：`{"platform","query","collected_at","url","title","content"(≤2000字),"author","published_at","likes","comments_count","comments":[{"text","likes","author"}],"extra":{}}`（xhs 源的 extra 含 `note_type: video|image|unknown`）。

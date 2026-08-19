@@ -228,7 +228,8 @@ def merge_url_rows(a: dict, b: dict) -> dict:
     """同 URL 两条 raw 记录合并保优。
 
     背景：web 源 Exa 摘要记录与 Jina 全文记录同 URL 先后入库，
-    旧逻辑"首见保留"会丢后到的全文。合并规则：
+    旧逻辑"首见保留"会丢后到的全文。抖音口播转写批次与主批次同 URL 同理——
+    带【口播转写】的 content 更长、按此规则自然胜出，无需特判。合并规则：
     - 以 content 更长的一条为主体（标题/正文/评论列表随主体）；
     - likes / comments_count 取两者较大值；
     - published_at 保留更新的（能解析的优先，都可解析取更晚；都解析失败取非空）；
