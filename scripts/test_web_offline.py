@@ -548,7 +548,7 @@ HITS = [
 
 def run_main(queries, exa_map, jina_map=None, direct_map=None, days=None):
     """全 mock 跑一次 cw.main()，返回 (exit_code, stdout, stderr, TemporaryDirectory)。
-    输出全部写进临时目录，不触 E:\\租房\\data。"""
+    输出全部写进临时目录，不触真实数据目录。"""
     td = tempfile.TemporaryDirectory()
     argv = ["collect_web.py"]
     for q in queries:

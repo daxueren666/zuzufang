@@ -15,7 +15,7 @@
        extra.blocked=true)。
 级别2: 若正文被拦比例达到半数(或搜索本身被拦), 先随机 2-5s 重试 1 次仍 403 才
        触发 Playwright 浏览器兜底, 持久化 context(user_data_dir=
-       E:\\租房\\tools\\douban-profile, 自动创建):
+       <tools>/douban-profile, 自动创建):
        ① 有登录素材(档案非空/DOUBAN_COOKIE)先 headless 快速开 context 查档案
          cookie 有效性(context.cookies() 判 dbcl2, HttpOnly 页面 JS 看不到)并试
          一次列表页(15s 超时): 有 dbcl2 或列表匿名可采 → 全程无头静默采集, 不弹窗;

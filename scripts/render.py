@@ -6,7 +6,7 @@ analysis 字段可能缺省，一律回退默认值；severity/confidence 中英
 
 --geo data/geo/<标的>.json 时注入地理块（地图 + 通勤/噪音/配套文字层）；
 JSAPI 密钥读 ~/.rent-assist/keys.env 的 AMAP_JSAPI_KEY / AMAP_JSAPI_SECRET（环境
-变量优先；旧位置 data/keys.env 兼容回退。AMAP_WEB_KEY 绝不进模板），key 缺失时
+变量优先。AMAP_WEB_KEY 绝不进模板），key 缺失时
 地图块自动降级为文字版。
 
 用法：
@@ -113,7 +113,7 @@ def _int(v, default=0):
 
 def load_jsapi_keys() -> dict:
     """读 AMAP_JSAPI_KEY / AMAP_JSAPI_SECRET（环境变量优先 >
-    ~/.rent-assist/keys.env > 旧位置 data/keys.env 兼容回退；KEY=VALUE，# 注释）。
+    ~/.rent-assist/keys.env ；KEY=VALUE，# 注释）。
 
     红线：AMAP_WEB_KEY 只供 geocode.py 本地调用，这里绝不读取、绝不进模板；
     且只把 jsapi_key/jsapi_secret 两个值放进模板上下文，不传整个文件内容。
@@ -122,12 +122,6 @@ def load_jsapi_keys() -> dict:
     out = {"jsapi_key": (os.environ.get("AMAP_JSAPI_KEY") or "").strip(),
            "jsapi_secret": (os.environ.get("AMAP_JSAPI_SECRET") or "").strip()}
     env_path = ac.keys_env_path()  # 统一解析：RENT_ASSIST_KEYS > E:\租房\config\keys.env > ~/.rent-assist/keys.env
-    if not env_path.is_file():
-        legacy = SKILL_ROOT / "data" / "keys.env"
-        if legacy.is_file():
-            print(f"warn: 密钥文件位于旧位置 {legacy}，请迁移到 {env_path}"
-                  f"（skill 目录可能被整体拷贝/分发）", file=sys.stderr)
-            env_path = legacy
     if not env_path.is_file():
         return out
     try:

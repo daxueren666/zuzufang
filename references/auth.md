@@ -26,7 +26,7 @@
 - 探测：HTTP GET `https://www.douban.com/group/search?cat=1019&q=test`（1 次轻请求）。
   `200` 匿名可用；`403` 需登录态。
 - **登录态 = douban-profile 持久化目录**（存在且非空=有档案）：级别2 用
-  `launch_persistent_context(user_data_dir=<tools>\douban-profile)`，已有
+  `launch_persistent_context(user_data_dir=<tools>/douban-profile)`，已有
   档案先 headless 静默试一次列表页（15s），通过则全程无头不弹窗；通不过且交互
   终端才 headless=False 弹窗人工登录（cookie 落盘，后续免登录；滑块人工介入
   保留）。备选：`DOUBAN_COOKIE` 环境变量（`'bid=xx; ...'` 或 JSON 数组格式）。
@@ -37,7 +37,7 @@
 
 ### 抖音（douyin）
 - 通道：MediaCrawler（`--lt qrcode`），登录态缓存持久化在
-  `<tools>\MediaCrawler\browser_data\dy_user_data_dir`。
+  `<tools>/MediaCrawler/browser_data/dy_user_data_dir`。
 - 探测：检查该目录存在且非空。有缓存 = 复用登录态；无缓存 = 首跑
   collect_douyin.py 弹可见浏览器扫码，**一次长期有效**。
 - collect_douyin.py 跑前打印缓存状态；跑完若生成缓存则更新 auth_state.json。
@@ -76,7 +76,7 @@ python scripts/ensure_auth.py --platform xhs --timeout 600
 
 ## 4. auth_state.json 说明
 
-位置：`<data>\auth_state.json`（原子写，UTF-8；auth_common.data_dir() 解析，RENT_ASSIST_DATA 可覆盖；--parallel 下各 worker 写隔离目录不回写主 state）。记录各平台**最近一次实测**
+位置：`<data>/auth_state.json`（原子写，UTF-8；auth_common.data_dir() 解析，RENT_ASSIST_DATA 可覆盖；--parallel 下各 worker 写隔离目录不回写主 state）。记录各平台**最近一次实测**
 结果，供排障与状态汇总展示；它不是信任凭据——采集脚本每次开跑仍做真实探测。
 
 ```json

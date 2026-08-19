@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """rent-assist 门面页本地服务：输入需求 → 自动拉终端跑 Claude → 报告自动打开。
 
-端口 8770（仅 127.0.0.1）。路由：
+端口 8770（默认绑 0.0.0.0，手机同 WiFi 可访问；设 RENT_ASSIST_BIND=127.0.0.1 可仅本机）。路由：
   GET  /                    门面页（templates/landing.html）
   HEAD/GET /ping            探测（页面上按钮据此前后切换 直连/复制 模式）
   POST /run   {text}        写 prompt 临时文件并拉起可见终端: claude "<prompt>"

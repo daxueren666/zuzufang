@@ -2,8 +2,8 @@
 """rent-assist 高德地理层：geocode / around / noise / route（Web 服务 REST + SQLite 永久缓存）。
 
 密钥：AMAP_WEB_KEY，优先级：环境变量 > E:\租房\config\keys.env > ~/.rent-assist/
-keys.env（KEY=VALUE，支持 # 注释行）> 旧位置 data/keys.env（兼容回退，打印迁移
-警告）；启动时读一次；绝不硬编码/打印/写入任何输出。文件缺失或无该键 -> stderr
+keys.env（KEY=VALUE，支持 # 注释行）。
+启动时读一次；绝不硬编码/打印/写入任何输出。文件缺失或无该键 -> stderr
 提示后 exit 2。
 
 缓存：~/.rent-assist/data/cache.db（RENT_ASSIST_DATA 可覆盖）表 geocode_cache(key, resp, created_at)，命中直接用、永不过期；
@@ -94,25 +94,16 @@ _KEY = None
 
 
 def _keys_env_path() -> Path:
-    """密钥文件位置：优先 E:\租房\config\keys.env（数据盘，skill 外），缺失时
-    ~/.rent-assist/keys.env（skill 外，防随 skill 分发泄露）。
-
-    旧位置 SKILL_ROOT/data/keys.env 仅作兼容回退（打印迁移警告）。
+    """密钥文件位置：ac.keys_env_path() 统一解析（RENT_ASSIST_KEYS >
+    E:\\租房\\config\\keys.env > ~/.rent-assist/keys.env，均在 skill 目录外，
+    防随 skill 分发泄露；密钥永不放回 skill 目录）。
     """
-    home_path = ac.keys_env_path()  # 统一解析：RENT_ASSIST_KEYS > E:\租房\config\keys.env > ~/.rent-assist/keys.env
-    if home_path.is_file():
-        return home_path
-    legacy = SKILL_ROOT / "data" / "keys.env"
-    if legacy.is_file():
-        print(f"warn: 密钥文件位于旧位置 {legacy}，请迁移到 {home_path}"
-              f"（skill 目录可能被整体拷贝/分发）", file=sys.stderr)
-        return legacy
-    return home_path
+    return ac.keys_env_path()
 
 
 def load_amap_key() -> str:
     """读 AMAP_WEB_KEY（优先级：环境变量 > E:\租房\config\keys.env >
-    ~/.rent-assist/keys.env > 旧位置回退）；缺失/无效 -> exit 2。"""
+    ~/.rent-assist/keys.env ）；缺失/无效 -> exit 2。"""
     global _KEY
     if _KEY:
         return _KEY

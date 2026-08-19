@@ -81,8 +81,12 @@ def print_install_guide(reason):
 
 
 def main():
-    print("[check_deps] 数据目录: %s" % ac.data_dir())
-    print("[check_deps] 工具目录: %s" % ac.tools_dir())
+    print("[check_deps] 数据目录: %s" % ac.data_dir(create=False))
+    t = ac.tools_dir()
+    print("[check_deps] 工具目录: %s（MediaCrawler: %s / asr-venv: %s）"
+          % (t,
+             "有" if (t / "MediaCrawler").is_dir() else "无→抖音源不可用",
+             "有" if (t / "asr-venv").is_dir() else "无→口播转写不可用"))
     kp = ac.keys_env_path()
     print("[check_deps] 密钥文件: %s%s" % (kp, "" if kp.is_file() else "（缺失，可选：高德/Jina key）"))
     exe = shutil.which("agent-reach")

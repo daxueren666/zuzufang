@@ -350,15 +350,17 @@ def worker_python(platform):
     """并行 worker 的解释器。
 
     抖音 worker 用 MediaCrawler venv 的 python（路径与 collect_douyin.check_env
-    同源：E:\\租房\\tools\\MediaCrawler\\.venv\\Scripts\\python.exe，3.11+），
-    其余平台用当前解释器。run_collect / collect_douyin 均纯标准库，3.11 可直接
-    跑；venv 缺失时回退 sys.executable 并警告（采集脚本内部本就会再探测 venv）。
+    同源：<tools>/MediaCrawler/.venv，经 auth_common.venv_python 按平台解析，
+    3.11+），其余平台用当前解释器。run_collect / collect_douyin 均纯标准库，
+    3.11 可直接跑；venv 缺失时回退 sys.executable 并警告（采集脚本内部本就会
+    再探测 venv）。
     """
     if platform != "douyin":
         return sys.executable
     try:
+        import auth_common as ac
         import collect_douyin
-        vpy = collect_douyin.DEFAULT_MC_DIR / ".venv" / "Scripts" / "python.exe"
+        vpy = ac.venv_python(collect_douyin.DEFAULT_MC_DIR / ".venv")
     except ImportError:
         return sys.executable
     if vpy.is_file():

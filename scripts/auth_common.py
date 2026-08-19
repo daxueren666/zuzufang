@@ -32,22 +32,24 @@ from pathlib import Path
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
-def data_dir(sub: str = "") -> Path:
+def data_dir(sub: str = "", create: bool = True) -> Path:
     """个人数据根目录（隐私：与 skill 目录分离，skill 目录可整体分发）。
 
-    优先环境变量 RENT_ASSIST_DATA，否则 ~/.rent-assist/data。返回前自动创建：
-    sub 为空建根目录；sub 无扩展名（目录名，如 "raw"）连子目录一起建；
-    sub 带扩展名（文件名，如 "auth_state.json"）只建到其父目录。
+    解析：环境变量 RENT_ASSIST_DATA > 开发机 E:\\租房\\data（存在时）>
+    ~/.rent-assist/data。create=True 时返回前自动创建（sub 为空建根目录；
+    sub 无扩展名连子目录一起建；带扩展名只建到父目录）；create=False 只解析
+    不落盘，供 check_deps 等只读探测。
     """
     root = Path(os.environ.get("RENT_ASSIST_DATA")
                 or (Path(r"E:\租房\data") if Path(r"E:\租房\data").exists()
                     else Path.home() / ".rent-assist" / "data"))
     p = root / sub if sub else root
-    try:
-        (p if not sub or p.suffix == "" else p.parent).mkdir(
-            parents=True, exist_ok=True)
-    except OSError:
-        pass
+    if create:
+        try:
+            (p if not sub or p.suffix == "" else p.parent).mkdir(
+                parents=True, exist_ok=True)
+        except OSError:
+            pass
     return p
 
 
@@ -67,6 +69,18 @@ def tools_dir(sub: str = "") -> Path:
     return root / sub if sub else root
 
 
+def venv_python(venv_dir) -> Path:
+    """venv 解释器路径，按平台布局解析（Windows: Scripts/python.exe；
+    Linux/macOS: bin/python）。优先返回实际存在的一个，都不存在时按当前
+    平台给默认布局（供报错提示用）。"""
+    d = Path(venv_dir)
+    win = d / "Scripts" / "python.exe"
+    posix = d / "bin" / "python"
+    if posix.exists() and not win.exists():
+        return posix
+    return win if os.name == "nt" else posix
+
+
 def keys_env_path() -> Path:
     """密钥文件位置：RENT_ASSIST_KEYS > E:\\租房\\config\\keys.env（存在时）>
     ~/.rent-assist/keys.env。密钥永远在 skill 目录外，不进任何仓库。"""
@@ -77,7 +91,7 @@ def keys_env_path() -> Path:
     return p if p.is_file() else Path.home() / ".rent-assist" / "keys.env"
 
 
-DOUYIN_DATA_DIR = tools_dir(r"MediaCrawler\browser_data\dy_user_data_dir")
+DOUYIN_DATA_DIR = tools_dir("MediaCrawler") / "browser_data" / "dy_user_data_dir"
 DOUBAN_PROFILE_DIR = tools_dir("douban-profile")
 
 XHS_PROBE_QUERY = "租房"
@@ -419,7 +433,7 @@ LOCAL_BROWSERS_PATH = tools_dir("playwright-browsers")
 
 
 def ensure_playwright_browsers_path():
-    """本机浏览器内核统一放 E 盘(磁盘纪律): 未显式设置且目录存在时注入
+    """浏览器内核集中目录: 未显式设置且目录存在时注入
     PLAYWRIGHT_BROWSERS_PATH，否则 launch 报 Executable doesn't exist。"""
     if not os.environ.get("PLAYWRIGHT_BROWSERS_PATH") \
             and LOCAL_BROWSERS_PATH.is_dir():

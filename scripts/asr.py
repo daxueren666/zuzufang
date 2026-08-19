@@ -47,7 +47,7 @@ VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".flv", ".webm", ".m4v", ".ts"}
 SAMPLE_RATE = 16000
 DEFAULT_MODEL_DIR = ac.tools_dir("models") / "sherpa-onnx-sense-voice-small"
 DEFAULT_FFMPEG = Path(r"E:\ffmpeg\ffmpeg-9.0-essentials_build\bin\ffmpeg.exe")
-VENV_PY = ac.tools_dir("asr-venv") / "Scripts" / "python.exe"
+VENV_PY = ac.venv_python(ac.tools_dir("asr-venv"))
 # 模型权重候选文件名（ModelScope xiaowangge 包用 model_q8.onnx，
 # sherpa-onnx 官方 release 包用 model.int8.onnx）
 MODEL_FILE_CANDIDATES = ("model_q8.onnx", "model.int8.onnx", "model.onnx")

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""rent-assist: 抖音采集脚本（经 MediaCrawler，本地部署于 E:\\租房\\tools\\MediaCrawler）。
+"""rent-assist: 抖音采集脚本（经 MediaCrawler，部署于 <tools>/MediaCrawler，
+路径解析见 auth_common.tools_dir）。
 
 subprocess 调 MediaCrawler（dy 平台 / search 类型 / 开评论 / jsonl 输出），
 跑完读它的输出 jsonl，转成本 skill 统一 schema 追加写入 {out-dir}/douyin_*.jsonl。
@@ -36,7 +37,7 @@ CDP 无代码防护: MediaCrawler 默认 ENABLE_CDP_MODE=True, 与本机签名�
     (与 --get-video 的 ENABLE_GET_MEIDAS 补丁共用同一套备份/恢复)。
 
 前置条件:
-    - E:\\租房\\tools\\MediaCrawler 已克隆且 .venv 可用（MediaCrawler 要求
+    - <tools>/MediaCrawler 已克隆且 .venv 可用（MediaCrawler 要求
       Python >= 3.11，依赖以其 requirements.txt 为准）
     - 抖音需 Node.js >= 16（MediaCrawler 用 pyexecjs 算签名）
     - 首次运行会打开浏览器，需用抖音 App 扫码登录一次（登录态缓存持久化在
@@ -73,7 +74,7 @@ PER_POST_COMMENT_FETCH = 3  # MediaCrawler 每帖实际抓取评论数 = top_com
 
 # ---- 视频下载 + 口播转写（--get-video，sherpa-onnx 管线详见 asr.py） ----
 GET_VIDEO_MAX = 3           # --get-video 上限（每视频几十 MB，控制下载量）
-ASR_VENV_PY = ac.tools_dir("asr-venv") / "Scripts" / "python.exe"
+ASR_VENV_PY = ac.venv_python(ac.tools_dir("asr-venv"))
 ASR_SCRIPT = Path(__file__).resolve().parent / "asr.py"
 ASR_TIMEOUT = 900           # 单视频转写超时（含模型加载，int8 CPU）
 SPOKEN_PREFIX = "【口播转写】"
@@ -142,10 +143,15 @@ def rebuild_venv_hint(mc_dir):
     print("[douyin] MediaCrawler venv 缺失或损坏，重建指引（它要求 Python >= 3.11，"
           "requirements.txt 基于 3.11，本机若只有 3.10 需先装 3.11+，勿用 3.10 硬装）:",
           file=sys.stderr)
-    print("[douyin]   cd /d \"%s\"" % mc_dir, file=sys.stderr)
-    print("[douyin]   py -3.11 -m venv .venv", file=sys.stderr)
-    print("[douyin]   .venv\\Scripts\\python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple", file=sys.stderr)
-    print("[douyin]   .venv\\Scripts\\playwright install chromium", file=sys.stderr)
+    if os.name == "nt":
+        print("[douyin]   cd /d \"%s\"" % mc_dir, file=sys.stderr)
+        print("[douyin]   py -3.11 -m venv .venv", file=sys.stderr)
+        print("[douyin]   .venv\\Scripts\\python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple", file=sys.stderr)
+        print("[douyin]   .venv\\Scripts\\playwright install chromium", file=sys.stderr)
+    else:
+        print("[douyin]   cd \"%s\" && python3.11 -m venv .venv" % mc_dir, file=sys.stderr)
+        print("[douyin]   .venv/bin/python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple", file=sys.stderr)
+        print("[douyin]   .venv/bin/playwright install chromium", file=sys.stderr)
 
 
 def check_env(mc_dir):
@@ -161,7 +167,7 @@ def check_env(mc_dir):
         print("[douyin] 重建: 删除该目录后重新 git clone https://github.com/NanmiCoder/MediaCrawler",
               file=sys.stderr)
         return None
-    vpy = mc_dir / ".venv" / "Scripts" / "python.exe"
+    vpy = ac.venv_python(mc_dir / ".venv")
     if not vpy.is_file():
         print("[douyin] 未找到 venv Python: %s" % vpy, file=sys.stderr)
         rebuild_venv_hint(mc_dir)
@@ -273,7 +279,7 @@ def run_mediacrawler(vpy, mc_dir, keywords, limit, per_post_comments):
            ]
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"
-    # playwright 浏览器内核装在 E 盘（紧邻 MediaCrawler 的 playwright-browsers/，
+    # playwright 浏览器内核（紧邻 MediaCrawler 的 playwright-browsers/，
     # 避免占 C 盘）；不注入该变量时 playwright 找不到 chromium
     pw_dir = mc_dir.parent / "playwright-browsers"
     if "PLAYWRIGHT_BROWSERS_PATH" not in env and pw_dir.is_dir():
@@ -393,16 +399,16 @@ def run_asr(mp4, venv_py=None, timeout=ASR_TIMEOUT):
     """用 asr-venv 的 python 跑 asr.py 转写单视频。
 
     返回清理后的转写文本；venv/转写/超时失败只 stderr 警告并返回 None
-    （不抛出：视频转写是增强项，失败不判采集失败）。txt 落视频旁（E 盘）。
+    （不抛出：视频转写是增强项，失败不判采集失败）。txt 落视频旁。
     """
     py = Path(venv_py) if venv_py else ASR_VENV_PY
     if not py.is_file():
         print("[douyin] 警告: asr venv 缺失（%s），跳过转写。安装指引:"
               % py, file=sys.stderr)
-        print("[douyin]   python -m venv E:\\租房\\tools\\asr-venv && "
-              "PIP_CACHE_DIR=E:\\租房\\tools\\pip-cache "
-              "E:\\租房\\tools\\asr-venv\\Scripts\\python -m pip install "
-              "sherpa-onnx soundfile numpy", file=sys.stderr)
+        print("[douyin]   python -m venv \"%s\" && PIP_CACHE_DIR=\"%s\" "
+              "\"%s\" -m pip install sherpa-onnx soundfile numpy"
+              % (ASR_VENV_PY.parent.parent, ac.tools_dir("pip-cache"),
+                 ASR_VENV_PY), file=sys.stderr)
         return None
     txt = mp4.with_suffix(".txt")
     cmd = [str(py), str(ASR_SCRIPT), "--video", str(mp4), "--out", str(txt)]

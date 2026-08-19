@@ -70,9 +70,10 @@ NOTE_ID_RE = re.compile(
 )
 
 PIL_INSTALL_HINT = (
-    "[media] Pillow 未安装。请先执行（清华镜像，pip 缓存放 E 盘）:\n"
-    "[media]   PIP_CACHE_DIR=E:\\租房\\tools\\pip-cache python -m pip install "
+    "[media] Pillow 未安装。请先执行（清华镜像）:\n"
+    "[media]   PIP_CACHE_DIR=\"%s\" python -m pip install "
     "pillow -i https://pypi.tuna.tsinghua.edu.cn/simple"
+    % ac.tools_dir("pip-cache")
 )
 
 

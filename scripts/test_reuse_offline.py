@@ -3,7 +3,7 @@
 """离线自测: run_collect 缓存强制复用 + 跨天去重修复（WS4）。
 全程 mock：伪造 collect_<平台>.py 脚本（不触网，只写 jsonl 并打印摘要行，
 调用痕迹落 FAKE_COLLECT_LOG）；raw/progress/伪造脚本全在临时目录，不碰
-E:\\租房\\data 既有产出。
+<data> 既有产出。
 
 覆盖:
   - scan_recent_urls: 近 7 天窗口（文件名 _YYYYMMDD 日期优先，无日期回退 mtime）、

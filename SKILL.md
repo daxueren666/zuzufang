@@ -13,9 +13,9 @@ description: 国内租房全能助手，一切围绕用户的租房问题：小�
 A 小区综合了解 / B 推荐评价 / C 选址建议 / D 找转租房源 / E 租房咨询。
 五条工作流最终都产出可视化报告：A/B/C/D 走采集→分析→报告；E 先在回复里直答，再出 FAQ 可视化报告（不采集，秒出）。
 
-数据流：run_collect.py 批次编排采集脚本（opencli 小红书 / 豆瓣 HTTP / Exa+Jina / 抖音 MediaCrawler；12315 不进编排器单独跑）→ `<data>\raw\*.jsonl`
-→ `clean.py` → `<data>\cleaned\*.json` → **Claude 只读 cleaned 做语义分析** → `<data>\analysis\<标的>.json`（按标的命名，防多标的互相覆盖）
-→ `render.py` → `<data>\reports\*.html`。
+数据流：run_collect.py 批次编排采集脚本（opencli 小红书 / 豆瓣 HTTP / Exa+Jina / 抖音 MediaCrawler；12315 不进编排器单独跑）→ `<data>/raw/*.jsonl`
+→ `clean.py` → `<data>/cleaned/*.json` → **Claude 只读 cleaned 做语义分析** → `<data>/analysis/<标的>.json`（按标的命名，防多标的互相覆盖）
+→ `render.py` → `<data>/reports/*.html`。
 
 诚实边界：只聚合公开口碑帖与转租帖；不爬贝壳/链家挂牌数据（反爬+判例风险），不做全网房源比价。报告仅为公开舆情聚合，不构成决策依据，无数据不等于安全。
 
@@ -27,7 +27,7 @@ A 小区综合了解 / B 推荐评价 / C 选址建议 / D 找转租房源 / E �
 python <skill>/scripts/check_deps.py
 ```
 
-`<skill>` 指本 skill 目录。**路径占位符（全文通用）**：`<data>`=数据目录、`<tools>`=第三方工具目录（MediaCrawler/asr-venv/模型/playwright 内核/douban-profile 所在）、`<keys>`=密钥文件；统一解析规则：环境变量（RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS）优先 → 开发机 `E:\租房\` 下对应路径（存在时）→ `~/.rent-assist/` 下对应路径；check_deps.py 首屏会打印三者实际解析结果。数据目录下 raw/cleaned/analysis/geo/reports/media、缓存 cache.db、批次进度账本 progress/（断点续采与 summary 都在这里）均在 `<data>` 下，不落 skill 目录。按输出处理：
+`<skill>` 指本 skill 目录。**路径占位符（全文通用）**：`<data>`=数据目录、`<tools>`=第三方工具目录（MediaCrawler/asr-venv/模型/playwright 内核/douban-profile 所在）、`<keys>`=密钥文件；统一解析规则：环境变量（RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS）优先 → 开发机 `E:\租房\` 下对应路径（存在时）→ `~/.rent-assist/` 下对应路径；check_deps.py 首屏会打印三者实际解析结果（环境变量需在脚本进程启动前设置）。数据目录下 raw/cleaned/analysis/geo/reports/media、缓存 cache.db、批次进度账本 progress/（断点续采与 summary 都在这里）均在 `<data>` 下，不落 skill 目录。按输出处理：
 
 - **未装 agent-reach**：向用户转述安装指引并**停止本次采集类工作流**（意图 E 可继续）：
   1. 从 GitHub 仓库 `github.com/Panniantong/Agent-Reach` 安装：`agent-reach install --system`。
@@ -78,7 +78,7 @@ python <skill>/scripts/check_deps.py
 2. **下钻流程**：
    - **枚举子小区清单**：用 LLM 城市知识列出，再按用户需求（预算/通勤/合租整租）筛选；超过 8 个时先让用户选，或按需求砍到 4-6 个。
    - **逐子小区轻量采集**：每个子小区只跑 xhs + web 两源，query 按动态规则组合（`{子小区名} 租房`，用户有关注点则换成对应场景词），直跑单脚本 `--limit 10 --days 180 --sort discussion,hot`（如 `python <skill>/scripts/collect_xhs.py --query "天通苑本三区 租房" --limit 10 --days 180 --sort discussion,hot`，collect_web.py 同参；走编排器则 `run_collect.py --target 10 --platforms "xhs,web"`）。
-   - **合并清洗**：逐子小区调用 `python <skill>/scripts/clean.py --query <子小区名>`（如 `--query "天通苑本三区"`），产出各自 `<data>\cleaned\<子小区>.json` 后合并进同一次分析。
+   - **合并清洗**：逐子小区调用 `python <skill>/scripts/clean.py --query <子小区名>`（如 `--query "天通苑本三区"`），产出各自 `<data>/cleaned/<子小区>.json` 后合并进同一次分析。
    - **语义分析（Claude）**：写 `mode = "locate"` 的 analysis.json，`target.type = "片区"`；`candidates` 每个子小区一条（name/pros/cons/commute，commute 在 M3 前用文本描述并标注"文本估算"）；`findings` 同时保留片区级共性风险（如天通苑的二房东问题）。
    - **渲染与结论**：render.py 出子小区对比报告；`verdict` 用 2-3 句话给出"哪个子小区更适合你"的结论及理由，并在回复里复述。
 3. **频控**：子小区采集同样每源 ≤10 帖、脚本内随机间隔 sleep、7 天内复用缓存；单次任务上限 = 4-6 个子小区 × 2 平台，超出先砍清单、不加采集。
@@ -108,7 +108,7 @@ python <skill>/scripts/check_deps.py
    python <skill>/scripts/run_collect.py --target 300 --parallel --queries "天通苑住过,天通苑避坑,天通苑二房东" --platforms "xhs,douban,web,douyin" --days 180 --sort "discussion,hot" --min-per-platform 20 --douban-intent word
    ```
 
-   - **语义**：外层遍历查询词、内层遍历平台，每个（词 × 平台）组合一批（每批每平台 limit 20），自动累计到 `--target` 总量（`--per-platform N` 可直接定每平台上限）；断点续采：中断后重跑自动跳过已完成组合（进度账本 <data>\progress\<slug>.json，done 超 7 天自动失效）。
+   - **语义**：外层遍历查询词、内层遍历平台，每个（词 × 平台）组合一批（每批每平台 limit 20），自动累计到 `--target` 总量（`--per-platform N` 可直接定每平台上限）；断点续采：中断后重跑自动跳过已完成组合（进度账本 <data>/progress/<slug>.json，done 超 7 天自动失效）。
    - **7 天复用闸门（代码强制）**：某（平台×查询词）组合近 7 天已采 ≥10 条 → 自动跳过并在 `[复用]` 行打印明细；`--refresh` 强制全部重采（--parallel 下会透传给各平台 worker）。`--parallel` 下各 worker 的 auth_state 写隔离目录、不回写主 state（只影响展示层，不影响采集）。
    - **停止规则（按平台）**：达到 target 配额即停；连续 2 批新增率 <10% 或连续 3 批失败则停该平台；查询词耗尽仍未达 `--min-per-platform` 时依次启用 `--extra-queries "补位词1,补位词2"` 续采。
    - **退出码**：0=正常结束（允许部分批次失败）；3=子脚本需登录，整体中止，先跑 `python <skill>/scripts/ensure_auth.py` 再重跑；130=用户中断。子脚本退出 4=该源数据质量差，记 degraded 继续并按降级处理；2 及其他=失败继续，重跑会重试。
@@ -118,11 +118,11 @@ python <skill>/scripts/check_deps.py
    - 同标的 **7 天内已采集** → run_collect 启动时自动识别复用（`[复用]` 明细，`--refresh` 强制重采）；cleaned/analysis/report 产物同样直接沿用，除非用户要求重跑。
 
    **采集后健康检查（必做）**：读 run_collect stdout 末尾 `[汇总]` 行（总量、当日去重新增、summary 与账本路径），必要时读 progress/<slug>.summary.json 里各平台条数与失败/降级组合；并核对 cleaned 数据中 `note_fetch_failed` / `comments_fetch_failed` 标记占比：任一占比 ≥50% → 视为该源本轮失败，按降级规则处理（跳过该源、在 `coverage.note` 说明），不基于残缺数据下结论。
-5. **清洗**：`python <skill>/scripts/clean.py --query <标的>` → 产出 `<data>\cleaned\<标的>.json`（去重、广告过滤、求租帖剔除、8 类风险粗分类、房源帖识别、评论取 top）。
+5. **清洗**：`python <skill>/scripts/clean.py --query <标的>` → 产出 `<data>/cleaned/<标的>.json`（去重、广告过滤、求租帖剔除、8 类风险粗分类、房源帖识别、评论取 top）。
 6. **媒体处理（用户 2026-08-15 定：小红书不读图）**：xhs 以正文+评论为主，**不默认下载图片识别**；fetch_media.py 保留为可选工具，仅在用户点名"看看帖子里的图"时使用（`--note-ids "id1,id2"` 或完整 URL）。
-7. **抖音视频口播转写**：采集命令加 `--get-video N`（N≤3，对讨论 top 视频帖：MediaCrawler 下载→ffmpeg 抽音频→sherpa-onnx+SenseVoice 本地转写→文本以"【口播转写】"并入该帖 content，extra.asr=true）。注意：MediaCrawler 开视频后会下载搜索页全部结果，**--get-video 务必配小 limit（如 --limit 3）**控带宽。运行时已装 E 盘（<tools>\asr-venv + models，缺依赖时脚本 exit 3 给指引）；手动转写单文件用 `python <skill>/scripts/asr.py --video <文件>`。
-8. **语义分析（Claude 亲自做，只读 <data>\cleaned\*.json）**：首要任务是**回答用户提出的那个问题**：用户问推荐就给推荐结论，问价格就汇总价格锚点，问二房东就查二房东证据。references/risk-signals.md 的风险八维只作为组织发现的分类词汇表（复核 clean.py 粗分类、剔除否定语境误命中如"从来没漏过水"），不是分析的目的。按下方 schema 写出 `<data>\analysis\<标的>.json`（按标的命名，防多标的互相覆盖；schema 不变）。
-9. **渲染**：`python <skill>/scripts/render.py --analysis <data>\analysis\<标的>.json --cleaned <data>\cleaned\<标的>.json`（启用地理层时再加 `--geo <data>\geo\<标的>.json`）→ `<data>\reports\<标的>_<YYYYMMDD>.html`。最后告知用户报告绝对路径，并给一句话结论。
+7. **抖音视频口播转写**：采集命令加 `--get-video N`（N≤3，对讨论 top 视频帖：MediaCrawler 下载→ffmpeg 抽音频→sherpa-onnx+SenseVoice 本地转写→文本以"【口播转写】"并入该帖 content，extra.asr=true）。注意：MediaCrawler 开视频后会下载搜索页全部结果，**--get-video 务必配小 limit（如 --limit 3）**控带宽。运行时装于 <tools>/asr-venv + models（缺依赖时脚本 exit 3 给指引）；手动转写单文件用 `python <skill>/scripts/asr.py --video <文件>`。
+8. **语义分析（Claude 亲自做，只读 <data>/cleaned/*.json）**：首要任务是**回答用户提出的那个问题**：用户问推荐就给推荐结论，问价格就汇总价格锚点，问二房东就查二房东证据。references/risk-signals.md 的风险八维只作为组织发现的分类词汇表（复核 clean.py 粗分类、剔除否定语境误命中如"从来没漏过水"），不是分析的目的。按下方 schema 写出 `<data>/analysis/<标的>.json`（按标的命名，防多标的互相覆盖；schema 不变）。
+9. **渲染**：`python <skill>/scripts/render.py --analysis <data>/analysis/<标的>.json --cleaned <data>/cleaned/<标的>.json`（启用地理层时再加 `--geo <data>/geo/<标的>.json`）→ `<data>/reports/<标的>_<YYYYMMDD>.html`。最后告知用户报告绝对路径，并给一句话结论。
 
 **数据稀疏降级**：cleaned 有效帖总量 <3 条 → 不走常规报告，改读 references/checklist.md 输出与标的相关阶段的章节（JSON 或文本），并明示"无数据≠安全，公开舆情未覆盖不代表无风险，建议实地核验"。
 
@@ -160,7 +160,7 @@ python <skill>/scripts/check_deps.py
 不采集任何数据、不跑清洗，两步走（先直答、再出报告）：
 
 1. **直接答**：读 `references/checklist.md`，定位与问题对应的阶段小节，结合问题具体作答（可引用清单条目），答案直接写在回复里，不让用户等报告。
-2. **FAQ 可视化报告**：把答案整理成 `mode = "faq"` 的 analysis.json，跑 render.py 出报告落 `<data>\reports\`：
+2. **FAQ 可视化报告**：把答案整理成 `mode = "faq"` 的 analysis.json，跑 render.py 出报告落 `<data>/reports/`：
    - `question` 用用户问题原话；`sections` 2-4 个分节、每节 3-6 要点；`risk_notes` 风险提示；`action_checklist` 可勾选行动清单。
    - 不传 `--cleaned`/`--geo`，秒出。
    - **诚实边界**：faq 报告基于通用知识与会话材料（checklist 等），无平台数据支撑，报告中如实标注。
@@ -182,9 +182,9 @@ python <skill>/scripts/check_deps.py
    around 的 target 直接用 geocode 返回的 location；route 的起点=标的、终点=用户提供的通勤目的地（用户没给就不跑 route）。noise 命令保留但默认不跑：仅用户主动问噪音时执行 `python <skill>/scripts/geocode.py noise <坐标> --city <城市>`。
 2. **主动问通勤（交互）**：意图 A/B 在输入解析时顺带问一句"上班地点/通勤目的地是哪？"（用户可拒绝；仅当标的为小区/片区时问，中介/房东人名标的不问）。用户给了 → 跑 route（起点=标的、终点=该地点），geo.json 写 route 段，模板自动画通勤虚线+摘要；拒绝或没有 → 跳过 route，不追问。报告出来后用户补充工作地也一样补跑。
 3. **按需周边查询（交互）**：用户问"附近有没有大超市/医院/健身房"这类配套 → 直接跑 `python <skill>/scripts/geocode.py around <坐标> --city <城市> --custom "超市"`（--custom 单独给定时只查该关键词不查预置 8 组，省配额；逗号可分隔多个）→ **先用文字直接回答**（名称+距离，取最近 5），同时把返回的 group（group 名=关键词）追加进 geo.json 的 around.groups（见第 5 条），重跑 render 后地图上以灰点可视化。
-4. **组装** `<data>\geo\<标的>.json`：四段输出拼成 `{"geocode":{location,formatted_address,city},"around":{"radius_m":1500,"groups":[{group,pois:[{name,distance_m,address,location}]}]},"noise":{"total":0,"hits":[{type,name,distance_m,address,location}]},"route":{mode,summary,distance_m,duration_min,transfers,origin_location,dest_location}}`，可参照现有 `<data>\geo\天通苑.json`。
+4. **组装** `<data>/geo/<标的>.json`：四段输出拼成 `{"geocode":{location,formatted_address,city},"around":{"radius_m":1500,"groups":[{group,pois:[{name,distance_m,address,location}]}]},"noise":{"total":0,"hits":[{type,name,distance_m,address,location}]},"route":{mode,summary,distance_m,duration_min,transfers,origin_location,dest_location}}`，可参照 `<data>/geo/` 下已有 geo 文件（如有）。
 5. **groups 运行时追加**：同一标的的多次 around 结果（预置组/自定义组）**合并写回同一个 geo.json**——新 group 直接 append 进 around.groups，同名 group 用新结果覆盖；追加后只重跑 render，不重采 geocode/noise/route 段。
-6. **渲染**：`python <skill>/scripts/render.py --analysis <data>\analysis\<标的>.json --cleaned <data>\cleaned\<标的>.json --geo <data>\geo\<标的>.json`。模板渲染地图块（小区强调色 marker、配套灰点；仅当 geo.json 带 noise 段才画噪音红点，仅当 coverage.note 标了「通勤目的地：」才画通勤虚线）+ 断网可读的文字层（配套分组网格；通勤摘要仅当用户提供了目的地）。自定义组与预置组同构（group=关键词、pois 同字段），模板按组名直接显示，无需改动。
+6. **渲染**：`python <skill>/scripts/render.py --analysis <data>/analysis/<标的>.json --cleaned <data>/cleaned/<标的>.json --geo <data>/geo/<标的>.json`。模板渲染地图块（小区强调色 marker、配套灰点；仅当 geo.json 带 noise 段才画噪音红点，仅当 coverage.note 标了「通勤目的地：」才画通勤虚线）+ 断网可读的文字层（配套分组网格；通勤摘要仅当用户提供了目的地）。自定义组与预置组同构（group=关键词、pois 同字段），模板按组名直接显示，无需改动。
 7. **密钥**：`<keys>` 的 `AMAP_JSAPI_KEY`（进模板加载地图，客户端可见属正常，靠高德控制台域名白名单保护）与 `AMAP_JSAPI_SECRET`（securityJsCode）。`AMAP_JSAPI_SECRET` 待填时地图自动降级为文字版，填好后无需改模板。`AMAP_WEB_KEY` 只供 geocode.py 本地调用，**绝不进报告**。
 
 ## analysis.json schema（Claude 按此产出，render.py 消费）
@@ -266,24 +266,24 @@ python <skill>/scripts/check_deps.py
 | 脚本 | CLI | 输出 |
 |---|---|---|
 | check_deps.py | 无参数 | 退出码 0=就绪；缺依赖打印安装指引后退出 |
-| run_collect.py | `--per-platform N`（每平台上限，推荐，消除总量歧义）或 `--target`（总量停止线）；`--queries "Q1,Q2" --platforms "xhs,douban,web,douyin" --days --sort "discussion,hot" --min-per-platform [--extra-queries --batch-limit --top-comments 20 --parallel --douban-intent word\|listing --refresh --reuse-min N]`。`--parallel` 分平台并行子进程（各平台独立账本/日志，默认串行）；7 天复用闸门自动跳过已采组合，`--refresh` 强制重采 | <data>\raw\*.jsonl + progress/<slug>.summary.json |
-| collect_xhs.py | `--query --limit --top-comments --days --sort discussion\|hot\|time（可逗号组合）`；note/comments 失败自动重试 1 次 | <data>\raw\xhs_<标的slug>_<日期>.jsonl |
-| collect_douyin.py | `--query --limit --top-comments --days --sort discussion\|hot\|time（可逗号组合） --get-video N`（N≤3 下载 top 视频并口播转写，须配小 limit） | <data>\raw\douyin_*.jsonl |
-| collect_douban.py | `--query --limit --top-comments --days --sort --intent word\|listing`（口碑=word 裸搜评价词；找房=listing 拼租赁词）`--rental-words --group` | <data>\raw\douban_*.jsonl |
-| collect_web.py | `--query（可传多次） --limit --days --sort discussion\|hot\|time（可逗号组合）`；Exa 失败自动重试、Jina 失败降级直连再降级摘要 | <data>\raw\web_*.jsonl |
-| collect_12315.py | `--query --limit --days` | <data>\raw\complaint12315_*.jsonl |
+| run_collect.py | `--per-platform N`（每平台上限，推荐，消除总量歧义）或 `--target`（总量停止线）；`--queries "Q1,Q2" --platforms "xhs,douban,web,douyin" --days --sort "discussion,hot" --min-per-platform [--extra-queries --batch-limit --top-comments 20 --parallel --douban-intent word\|listing --refresh --reuse-min N]`。`--parallel` 分平台并行子进程（各平台独立账本/日志，默认串行）；7 天复用闸门自动跳过已采组合，`--refresh` 强制重采 | <data>/raw/*.jsonl + progress/<slug>.summary.json |
+| collect_xhs.py | `--query --limit --top-comments --days --sort discussion\|hot\|time（可逗号组合）`；note/comments 失败自动重试 1 次 | <data>/raw/xhs_<标的slug>_<日期>.jsonl |
+| collect_douyin.py | `--query --limit --top-comments --days --sort discussion\|hot\|time（可逗号组合） --get-video N`（N≤3 下载 top 视频并口播转写，须配小 limit） | <data>/raw/douyin_*.jsonl |
+| collect_douban.py | `--query --limit --top-comments --days --sort --intent word\|listing`（口碑=word 裸搜评价词；找房=listing 拼租赁词）`--rental-words --group` | <data>/raw/douban_*.jsonl |
+| collect_web.py | `--query（可传多次） --limit --days --sort discussion\|hot\|time（可逗号组合）`；Exa 失败自动重试、Jina 失败降级直连再降级摘要 | <data>/raw/web_*.jsonl |
+| collect_12315.py | `--query --limit --days` | <data>/raw/complaint12315_*.jsonl |
 | ensure_auth.py | `--platform xhs\|douban\|douyin\|all` | 子脚本退出码 3 后先跑它恢复登录态（douban 弹浏览器轮询等扫码，绝不秒退） |
-| fetch_media.py | `--note-ids "id1,id2"`（自动回 raw 查签名 URL）或直接传完整 URL；`--max-images-per-note 5` | <data>\media/<note_id>/（图片已压缩，供 Claude 视觉读图） |
-| asr.py | `--video <文件>` 或 `--video-dir <目录>`（sherpa-onnx+SenseVoice int8，已装 <tools>\asr-venv+models；缺依赖 exit 3 带指引） | 同名 .txt 转写文本（自动 ffmpeg 抽 16k wav） |
-| clean.py | `--query <标的>`（必填）；可选 `--raw-dir --out --aliases --city --max-age-months --no-entity-filter --keep-seek`（`--city <城市>` 城市消歧：黑名单 72 城+北京信号白名单，剔外地同名小区帖，meta 计 city_mismatch/city_kept_signal；默认剔除求租帖并计 meta.seek_posts） | <data>\cleaned\<标的>.json |
-| render.py | `--analysis <data>\analysis\<标的>.json [--cleaned <data>\cleaned\<标的>.json] [--geo <data>\geo\<标的>.json] [--out]` | <data>\reports\<标的>_<日期>.html |
+| fetch_media.py | `--note-ids "id1,id2"`（自动回 raw 查签名 URL）或直接传完整 URL；`--max-images-per-note 5` | <data>/media/<note_id>/（图片已压缩，供 Claude 视觉读图） |
+| asr.py | `--video <文件>` 或 `--video-dir <目录>`（sherpa-onnx+SenseVoice int8，已装 <tools>/asr-venv+models；缺依赖 exit 3 带指引） | 同名 .txt 转写文本（自动 ffmpeg 抽 16k wav） |
+| clean.py | `--query <标的>`（必填）；可选 `--raw-dir --out --aliases --city --max-age-months --no-entity-filter --keep-seek`（`--city <城市>` 城市消歧：黑名单 72 城+北京信号白名单，剔外地同名小区帖，meta 计 city_mismatch/city_kept_signal；默认剔除求租帖并计 meta.seek_posts） | <data>/cleaned/<标的>.json |
+| render.py | `--analysis <data>/analysis/<标的>.json [--cleaned <data>/cleaned/<标的>.json] [--geo <data>/geo/<标的>.json] [--out]` | <data>/reports/<标的>_<日期>.html |
 | serve_home.py | 门面页本地服务（8770 仅本机）。无参数直接跑；测试开关 RENT_ASSIST_PORT / RENT_ASSIST_NO_BROWSER / RENT_ASSIST_LAUNCH_CMD | 浏览器自动开门面页；输入需求拉终端跑 claude；盯 reports 新报告自动打开 |
 | test_render_check.py | 无参数 | 报告模板数据完整性自检（改模板前后必跑） |
 | test_*_offline.py（asr/auth/clean/intent/media/reuse/web 共 7 个） | 无参数 | 对应脚本的离线自检（改动对应脚本后运行该测试） |
 
 ### 门面页与本地入口（2026-08-15 新增）
 
-- **用户入口 = 双击启动 bat（开发机为 `E:\租房\启动租房助手.bat`；他机自建 bat 跑 `python <skill>/scripts/serve_home.py`，可用 RENT_ASSIST_WORK_DIR 指定 claude 工作目录）**：起本地服务（8770，仅 127.0.0.1）并自动打开浏览器门面页（templates/landing.html，蓝白风+SVG楼群动画，手机/桌面双端适配）。
+- **用户入口 = 双击启动 bat（开发机为 `E:\租房\启动租房助手.bat`；他机自建 bat 跑 `python <skill>/scripts/serve_home.py`，可用 RENT_ASSIST_WORK_DIR 指定 claude 工作目录）**：起本地服务（8770；默认绑 0.0.0.0，手机同 WiFi 可访问，设 RENT_ASSIST_BIND=127.0.0.1 可仅本机）并自动打开浏览器门面页（templates/landing.html，蓝白风+SVG楼群动画，手机/桌面双端适配）。
 - 门面页输入任意租房需求 → 点"开始查询" → 服务拉起新终端窗口跑 `claude "<需求>"`（在项目目录内跑，权限生效；量级菜单等交互在该终端里完成）→ 服务每 5s 盯 data/reports，新报告生成后页面自动弹出。
 - **历史报告与报告列表**：门面页有"历史报告"入口，或直接访问 `http://<主机>:8770/reports/`（索引页，mtime 倒序）；inbox 收到非租房输入时用 `scripts/out_of_scope.py` 生成范围外说明回传手机。
 - 没起服务时直接双击打开 landing.html 会自动降级为"复制提问"模式（零后端可用）。
@@ -293,15 +293,15 @@ raw jsonl 每行 schema：`{"platform","query","collected_at","url","title","con
 
 ### 抖音源（MediaCrawler）
 
-- 位置：`<tools>\MediaCrawler`（本地部署，要求 Python ≥3.11 与 Node.js ≥16，用其 `.venv` 运行）。
+- 位置：`<tools>/MediaCrawler`（本地部署，要求 Python ≥3.11 与 Node.js ≥16，用其 `.venv` 运行）。
 - **首次使用需扫码登录**：collect_douyin.py 会拉起 MediaCrawler 浏览器窗口，用抖音 App 扫码一次，登录态缓存在 MediaCrawler/browser_data/，之后免扫。缺 venv/登录失效时脚本会在 stderr 给重建指引并 exit 2，跳过该源不阻塞其他源。
 - 用法：`python <skill>/scripts/collect_douyin.py --query "天通苑住过" --limit 20 --top-comments 10 --days 180 --sort discussion,hot`（经 run_collect 编排时 --platforms 加 douyin 即可）。query **原样透传**（组合规则见 references/queries.md，评价词/供给侧词按意图选），抖音标题带小区名比例低、信号在正文+评论，结果侧不过滤交给 clean.py。要口播转写加 `--get-video N`（N≤3，务必配小 limit——MediaCrawler 开视频会下载搜索页全部结果；与 --parallel 互斥）。
 - **测试纪律同样适用**：联调一律 `--limit 3-5`；频控与 7 天缓存规则与其他源一致。
-- Playwright 内核装在 E 盘：`PLAYWRIGHT_BROWSERS_PATH=<tools>\playwright-browsers`（不设则 playwright 找不到 chromium）。collect_douyin.py 启动 MediaCrawler 时已自动注入，手动跑 MediaCrawler 时需自己 export。
+- Playwright 内核集中安装：`PLAYWRIGHT_BROWSERS_PATH=<tools>/playwright-browsers`（不设则用 playwright 默认位置）。collect_douyin.py 启动 MediaCrawler 时已自动注入，手动跑 MediaCrawler 时需自己 export。
 
 ## Token 纪律（铁律）
 
-1. **永不读取 <data>\raw\*.jsonl**，原始数据只供脚本消费。
+1. **永不读取 <data>/raw/*.jsonl**，原始数据只供脚本消费。
 2. 采集/编排脚本 stdout **只看末尾统计行**（run_collect 读 `[汇总]` 行，单脚本读摘要行），不读全文、不把输出重定向进上下文。
 3. 评论只看 clean.py 截取后的 top 评论，不看全量评论（小红书已不默认读图，用户点名时 fetch_media 每帖 ≤5 张）。
 4. 报告一律由 render.py 渲染，Claude 不写 HTML/CSS。
@@ -311,7 +311,7 @@ raw jsonl 每行 schema：`{"platform","query","collected_at","url","title","con
 
 - 采集以批次为单位：每批每平台 ≤20 帖，run_collect 自动多批累计到 target（正式建议 300、测试 --target 5），批间随机间隔 10-30s（脚本内实现，不并发轰炸单平台）。
 - 评论按点赞（最热）排序取 top，正式 --top-comments 20、测试 5。
-- 同标的 7 天内复用 <data>\raw 已有数据，不重复采集。
+- 同标的 7 天内复用 <data>/raw 已有数据，不重复采集。
 - 定位为个人低频自用，禁止批量爬取、禁止并发多开、禁止绕过平台限制。
 
 ## 第三方工具排障原则
