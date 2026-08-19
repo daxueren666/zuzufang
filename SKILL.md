@@ -199,7 +199,7 @@ python <skill>/scripts/check_deps.py
  "target":{"name":"","city":"","type":"小区|中介|片区"},
  "coverage":{"xhs":0,"douban":0,"complaint12315":0,"web":0,"note":""},
  "overall_score":0,"risk_level":"低|中|高|数据不足",
- "verdict":"推荐模式：一句话结论+适合人群",
+ "verdict":"recommend/locate 必填：一句话结论（约束仅取用户原话，未明说不附人群画像）",
  "dimensions":[{"name":"房屋质量","score":0,"reason":"","evidence_idx":[]}],
  "findings":[{"risk":"","severity":"高|中|低","confidence":"高|中|低","summary":"","evidence":[{"title":"","url":"","platform":"","quote":""}]}],
  "listings":[{"title":"","url":"","price_hint":"","room_hint":"","platform":"","published_at":""}],
@@ -210,8 +210,9 @@ python <skill>/scripts/check_deps.py
 
 字段约定：
 
-- `dimensions` 固定 8 项且顺序一致（与 references/risk-signals.md 分类法一一对应）：
+- `dimensions` 固定 8 项（与 references/risk-signals.md 分类法一一对应，口径统一便于跨报告对比）：
   房屋质量 / 房东中介 / 押金费用 / 虚假房源 / 噪音 / 物业 / 治安 / 通勤配套。
+  **数组顺序即展示顺序：用户问题点名的关注维排最前，其余按默认序，无数据维度（score 0 且 evidence_idx 空）沉底**——报告模板按数组顺序渲染，问"二房东多吗"时房东中介维置顶，不让空维度占卡抢视线。
   score 为 0-100；每维必带 `reason`（一句话中文归因，如"通勤配套 22：距地铁 1.5km+ 公交线少"）；无数据的维度 score 置 0 且 evidence_idx 留空。
 - `overall_score` 为 8 维加权（押金费用/房东中介/虚假房源权重更高）；`risk_level` 依据 findings 最高 severity 与数据量综合。
 - `findings.evidence.quote` 摘原文不超过 100 字；`evidence_idx` 指向 cleaned JSON 中帖子的下标。
@@ -222,7 +223,7 @@ python <skill>/scripts/check_deps.py
 - **禁止捏造通勤**：仅当用户明确给出上班地/通勤目的地才做通勤分析与地图画线，绝不假设、绝不替用户编工作地。用户提供了就在 coverage.note 写明「通勤目的地：X」，报告模板据此才渲染通勤块并画线；未提供时 geo.json 里残留的 route 数据不展示、不参与结论。
 - **默认不做周边噪音查询**：地理层默认只跑 geocode + around 配套查询；noise 仅用户主动问噪音时单独跑（geocode.py 的 noise 能力保留），geo.json 默认不含 noise 段，报告默认无噪音区块。
 - **报告内容矩阵（报告是全屏卡片左右翻页；分析层按此组织字段，第一卡永远是用户问题的直接答案）**：
-  - A 尽调：卡1 结论(overall_score/risk_level/verdict 要点摘要)+八维 → 卡2 关键发现(按 severity 排、每条带 evidence 可点溯源) → 卡3 房源/价格 → 卡4 好评精选 → 末卡 数据说明(coverage+方法+免责，紧凑)
+  - A 尽调：卡1 结论(overall_score/risk_level/verdict 要点摘要)+八维(用户关注维前置、无数据维沉底) → 卡2 关键发现(按 severity 排、每条带 evidence 可点溯源) → 卡3 房源/价格 → 卡4 好评精选 → 末卡 数据说明(coverage+方法+免责，紧凑)
   - B 推荐：卡1 大字 verdict+评分（适合人群仅当用户明说约束时出现）→ 卡2 正反理由+证据 → 卡3 价格与房源 → 卡4 配套(仅当用户给了通勤地或主动问配套才有) → 末卡 数据说明
   - C 选址：卡1 数据归纳的候选片区排名（数量由数据定，每条带证据）+一句话理由 → 卡2 片区对比(价格/通勤/口碑 对齐) → 卡3 各区代表小区+口碑 → 卡4 地图 → 末卡
   - D 找房源：卡1「近7天 N 条、预算内 M 条」→ 卡2 房源卡流(整卡可点开原帖，按新鲜度) → 卡3 价格分布 → 末卡

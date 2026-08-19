@@ -23,7 +23,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import clean          # noqa: E402
-from lexicon import detect_buy_sell_post, detect_seek_post  # noqa: E402
+from lexicon import detect_buy_sell_post, detect_seek_post, strip_scenario_words  # noqa: E402
 
 PASS, FAIL = 0, 0
 
@@ -453,12 +453,53 @@ def test_cli_seo_page_filter():
     check("CLI SEO 模板列表页剔除（标题/URL 特征+价格堆叠双信号），口碑帖不误杀", ok)
 
 
+# ---------------------------------------------------------------- 0 命中剥词 & 转写截断
+def test_strip_scenario_words():
+    cases = [
+        ("北京 龙泽苑 住过", "北京 龙泽苑"),   # 剥场景词，保城市前缀+标的
+        ("天通苑怎么样", "天通苑"),           # 无空格组合词（子串匹配）
+        ("天通苑租房体验", "天通苑"),         # 长词优先，防"租房"先拆碎
+        ("天通苑 个人转租", "天通苑"),
+        ("天通苑 租金多少钱", "天通苑"),
+        ("天通苑 避坑", "天通苑"),
+        ("天通苑", None),                    # 裸标的无可剥 → 不重搜
+        ("租房", None),                      # 剥完为空 → 不重搜
+    ]
+    allok = True
+    for q, expect in cases:
+        got = strip_scenario_words(q)
+        if got != expect:
+            allok = False
+            print("    期望 %s 得到 %s (%s)" % (expect, got, q))
+    check("strip_scenario_words 剥场景词（子串/长词优先/保城市前缀，剥不动返回 None）",
+          allok)
+
+
+def test_clean_row_asr_cap():
+    base = {"platform": "douyin", "url": "https://d/1", "title": "天通苑口播（测试）",
+            "published_at": "", "likes": 0, "comments_count": 0, "comments": []}
+    long_asr = "【口播转写】" + "字" * 1200
+    asr_it = clean.clean_row(dict(base, content=long_asr,
+                                  extra={"asr": True, "video_file": "v.mp4"}))
+    prefix_it = clean.clean_row(dict(base, content=long_asr, extra={}))
+    normal_it = clean.clean_row(dict(base, content="普通帖" + "字" * 1200,
+                                     extra={}))
+    ok = (len(asr_it["content"]) == len(long_asr)
+          and len(prefix_it["content"]) == len(long_asr)
+          and len(normal_it["content"]) == 500)
+    check("口播转写帖截断放宽 500→2000（extra.asr 或【口播转写】前缀），普通帖仍 500",
+          ok)
+
+
 def main():
     print("== lexicon.detect_seek_post ==")
     test_detect_seek_hit()
     test_detect_seek_not()
+    print("== lexicon.strip_scenario_words ==")
+    test_strip_scenario_words()
     print("== clean.clean_row ==")
     test_clean_row_note_passthrough()
+    test_clean_row_asr_cap()
     print("== clean.main CLI ==")
     test_cli_default_drop_seek()
     test_cli_keep_seek_flag()

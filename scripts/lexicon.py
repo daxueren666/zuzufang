@@ -290,6 +290,38 @@ OTHER_CITY_WORDS = [
 COMMON_CITY_WORDS = ["北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "武汉",
                      "西安", "重庆", "天津", "苏州", "长沙", "郑州", "青岛", "大连",
                      "厦门", "合肥", "济南", "福州", "昆明", "宁波", "无锡", "佛山"]
+
+# 场景词库（剥离用）：xhs/web/douyin 0 命中自愈时从组合词里剥掉场景词，
+# 剩下 城市前缀+标的 再重搜一次。词源 = references/queries.md §1 两栏场景词库。
+SCENARIO_WORDS = [
+    # 评价视角（口碑 A/B/C）
+    "租房体验", "住过", "体验", "怎么样", "怎样", "值得吗", "避坑", "踩坑",
+    "吐槽", "后悔吗", "租金多少钱", "多少钱", "租金", "口碑", "靠谱吗",
+    "套路", "退费", "推荐",
+    # 供给侧（找房 D）
+    "个人转租", "房东直租", "无中介", "急转", "直租", "转租", "合租",
+    # 泛词（"租房"禁单独用，但组合词里出现时剥掉留标的）
+    "租房",
+]
+
+
+def strip_scenario_words(query):
+    """剥掉 query 里的场景词，返回降级重搜词；剥完为空或一个都没剥掉返回 None。
+
+    用子串匹配（中文组合词常无空格，"天通苑怎么样"是整一个 token），
+    长词优先剥，防"租房体验"被"租房"先拆碎。城市词不剥（保留城市前缀收窄）。
+    """
+    q = query.strip()
+    if not q:
+        return None
+    rest = q
+    for w in sorted(SCENARIO_WORDS, key=len, reverse=True):
+        if w in rest:
+            rest = rest.replace(w, " ")
+    rest = " ".join(rest.split())
+    if not rest or rest == q:
+        return None
+    return rest
 # 城市名 -> URL 中的常见形态（pinyin 子域 + 中文城市名），小写匹配
 OTHER_CITY_URL_TOKENS = {
     "晋城": ["jincheng", "晋城"],

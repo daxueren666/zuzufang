@@ -52,6 +52,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import auth_common as ac
+import lexicon
 
 parse_pub_datetime = ac.parse_pub_datetime
 apply_time_window = ac.apply_time_window
@@ -483,6 +484,15 @@ def main():
     items = search_notes(args.query, max(1, args.limit))
     if items is None:
         sys.exit(3 if NEEDS_LOGIN[0] else 2)
+    # 0 命中自愈：组合词剥掉场景词（保城市前缀+标的）重搜一次，仅一次防死循环；
+    # 记录仍挂原 query（复用闸门按调用方请求词匹配）
+    if not items:
+        dq = lexicon.strip_scenario_words(args.query)
+        if dq:
+            print("[xhs] 0 命中，剥场景词降级重搜: %s" % dq)
+            items = search_notes(dq, max(1, args.limit))
+            if items is None:
+                sys.exit(3 if NEEDS_LOGIN[0] else 2)
 
     # --days 时间窗过滤：窗口内保留，无时间保留（计 time_unknown），窗口外丢弃
     items, (win_kept, win_dropped, win_unknown) = apply_time_window(

@@ -320,11 +320,15 @@ def clean_row(row: dict, old: bool = False, entity_hit: bool = True,
     if old:
         heat_score = int(heat_score * 0.8 + 0.5)
 
+    # 口播转写帖：转写文案是核心证据，截断放宽 500→2000（采集侧本就截 2000）
+    extra = row.get("extra") if isinstance(row.get("extra"), dict) else {}
+    content_cap = 2000 if (extra.get("asr") or "【口播转写】" in content) else 500
+
     item = {
         "platform": str(row.get("platform") or ""),
         "url": str(row.get("url") or ""),
         "title": title[:120],
-        "content": content[:500],
+        "content": content[:content_cap],
         "published_at": str(row.get("published_at") or ""),
         "likes": likes,
         "comments_count": comments_count,
@@ -341,8 +345,7 @@ def clean_row(row: dict, old: bool = False, entity_hit: bool = True,
         "heat_score": heat_score,
         "kw_hits": kw_hits,
     }
-    # 透传 raw extra 的 note_id / note_type（xhs 溯源用，存在才拷）
-    extra = row.get("extra") if isinstance(row.get("extra"), dict) else {}
+    # 透传 raw extra 的 note_id / note_type（xhs 溯源用，存在才拷；extra 已在上方读取）
     for key in ("note_id", "note_type"):
         if extra.get(key) not in (None, ""):
             item[key] = extra[key]

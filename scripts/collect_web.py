@@ -52,6 +52,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import auth_common as ac
+import lexicon
 
 parse_pub_datetime = ac.parse_pub_datetime
 apply_time_window = ac.apply_time_window
@@ -568,6 +569,12 @@ def collect_query(exe, query, args, src_counts):
     src_counts 为三来源（jina/direct/summary_only）累计计数，就地累加。
     """
     hits = exa_search(exe, query, max(1, args.limit))
+    # 0 命中自愈：组合词剥场景词重搜一次（记录仍挂原 query，复用闸门口径不变）
+    if not hits:
+        dq = lexicon.strip_scenario_words(query)
+        if dq:
+            print("[web] 0 命中，剥场景词降级重搜: %s" % dq, file=sys.stderr)
+            hits = exa_search(exe, dq, max(1, args.limit))
     if not hits:
         return 0, 0, (0, 0, 0), "exa_unavailable"
     print("[web] Exa 搜索得到 %d 条命中" % len(hits))

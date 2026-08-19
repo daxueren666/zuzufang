@@ -59,6 +59,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import auth_common as ac
+import lexicon
 
 parse_pub_datetime = ac.parse_pub_datetime
 apply_time_window = ac.apply_time_window
@@ -655,67 +656,76 @@ def main():
     node_hint()
     login_state_hint(args.mc_dir)
 
-    # query 原样透传给 MediaCrawler（检索词组合是调用方职责，本脚本不改写）
-    keywords = [args.query.strip()]
-    print("[douyin] 检索词: %s" % keywords[0])
-
+    # query 原样透传给 MediaCrawler（检索词组合是调用方职责）；唯一例外=0 命中自愈：
+    # 组合词跑完 0 条时剥场景词降级重跑一次（记录仍挂原 query，复用闸门口径不变）
     contents_p, comments_p = mc_output_files(args.mc_dir)
-    # MediaCrawler 按天追加写：记录运行前行数，跑完只读新增部分（同日多次运行互不干扰）
-    off_c, off_m = count_lines(contents_p), count_lines(comments_p)
-
-    # 配置防护（共用同一份原文备份，跑完 finally 必恢复；铁律: 动过必还原）:
-    # ① CDP 无代码防护: ENABLE_CDP_MODE=True 与本机签名管线不兼容（MediaCrawler
-    #    重装/更新后配置回 True 会让采集批次全灭），为 True 时临时改 False；
-    #    已是 False 则不动。② --get-video: ENABLE_GET_MEIDAS 临时开 True。
-    config_path = base_config_path(args.mc_dir)
-    config_backup = None
     before_videos = {}
     if args.get_video > 0:
         before_videos = scan_aweme_videos(videos_dir(args.mc_dir))
-    cur = backup_config(config_path)   # None=读失败（已警告），两种补丁都不做
-    if cur is not None:
-        patched, n_cdp = patch_disable_cdp(config_path, cur)
-        if n_cdp:
-            config_backup = cur        # 备份必须是补丁前的原文，finally 整体还原
-            cur = patched              # 后续 GET_MEIDAS 补丁在已关 CDP 的文本上叠
-            print("[douyin] ENABLE_CDP_MODE 检测为 True，已临时改 False（跑完恢复）——"
-                  "CDP 模式与本机签名管线不兼容，不关会采集全灭。")
-        if args.get_video > 0:
-            if config_backup is None:
-                config_backup = cur    # CDP 未动过时，cur 即当前原文
-            n = patch_enable_get_meidas(config_path, cur)
-            print("[douyin] --get-video %d: ENABLE_GET_MEIDAS 已临时开 True"
-                  "（补丁 %d 处，跑完恢复）" % (args.get_video, n))
-            if n == 0:
-                print("[douyin] 警告: base_config.py 未找到 'ENABLE_GET_MEIDAS = False'"
-                      " 行（可能已 True 或项目改名），按现状跑。", file=sys.stderr)
-
     # MediaCrawler 按页抓、limit 非硬顶：每帖抓评量随 --top-comments 自适应
     # （旧地板值 20 会让 top-comments=5 时日志显示"每帖抓评 20 条"，被误读为
     # 未透传；实际保留条数仍由 convert_rows 按 top_comments 截），下限 10 保底
     per_post = min(max(args.top_comments * PER_POST_COMMENT_FETCH, 10), 100)
-    print("[douyin] 启动 MediaCrawler（limit=%d，每帖抓评 %d 条（保留 top %d），超时 %ds）..."
-          % (args.limit, per_post, args.top_comments, args.timeout))
-    try:
-        rc, tail = run_mediacrawler(vpy, args.mc_dir, keywords,
-                                    max(1, args.limit), per_post)
-    finally:
-        if config_backup is not None:
-            if restore_config(config_path, config_backup):
-                print("[douyin] MediaCrawler 配置已恢复原文（ENABLE_CDP_MODE/"
-                      "ENABLE_GET_MEIDAS 均还原）")
-    refresh_login_state_after_run(args.mc_dir)  # 扫码成功生成缓存后立即登记
-    if rc != 0:
-        print("[douyin] MediaCrawler 运行失败（%s），日志末尾:\n%s" % (
-            "超时" if rc is None else "退出码 %s" % rc,
-            "\n".join(tail[-15:]) or "(无输出)"), file=sys.stderr)
-        sys.exit(2)
 
-    new_contents = read_delta(contents_p, off_c)
-    new_comments = read_delta(comments_p, off_m)
-    records, (win_kept, win_dropped, win_unknown) = convert_rows(
-        new_contents, new_comments, keywords,
-        args.top_comments, args.query.strip(), args.days, args.sort)
+    def run_keyword(kw):
+        """跑一次 MediaCrawler 并转换本次新增行（含配置 patch/restore）。
+
+        MediaCrawler 按天追加写：记录运行前行数，跑完只读新增部分
+        （同日多次运行互不干扰，降级重跑同样成立）。
+        """
+        off_c, off_m = count_lines(contents_p), count_lines(comments_p)
+        # 配置防护（共用同一份原文备份，跑完 finally 必恢复；铁律: 动过必还原）:
+        # ① CDP 无代码防护: ENABLE_CDP_MODE=True 与本机签名管线不兼容（MediaCrawler
+        #    重装/更新后配置回 True 会让采集批次全灭），为 True 时临时改 False；
+        #    已是 False 则不动。② --get-video: ENABLE_GET_MEIDAS 临时开 True。
+        config_path = base_config_path(args.mc_dir)
+        config_backup = None
+        cur = backup_config(config_path)   # None=读失败（已警告），两种补丁都不做
+        if cur is not None:
+            patched, n_cdp = patch_disable_cdp(config_path, cur)
+            if n_cdp:
+                config_backup = cur        # 备份必须是补丁前的原文，finally 整体还原
+                cur = patched              # 后续 GET_MEIDAS 补丁在已关 CDP 的文本上叠
+                print("[douyin] ENABLE_CDP_MODE 检测为 True，已临时改 False（跑完恢复）——"
+                      "CDP 模式与本机签名管线不兼容，不关会采集全灭。")
+            if args.get_video > 0:
+                if config_backup is None:
+                    config_backup = cur    # CDP 未动过时，cur 即当前原文
+                n = patch_enable_get_meidas(config_path, cur)
+                print("[douyin] --get-video %d: ENABLE_GET_MEIDAS 已临时开 True"
+                      "（补丁 %d 处，跑完恢复）" % (args.get_video, n))
+                if n == 0:
+                    print("[douyin] 警告: base_config.py 未找到 'ENABLE_GET_MEIDAS = False'"
+                          " 行（可能已 True 或项目改名），按现状跑。", file=sys.stderr)
+        print("[douyin] 检索词: %s" % kw)
+        print("[douyin] 启动 MediaCrawler（limit=%d，每帖抓评 %d 条（保留 top %d），超时 %ds）..."
+              % (args.limit, per_post, args.top_comments, args.timeout))
+        try:
+            rc, tail = run_mediacrawler(vpy, args.mc_dir, [kw],
+                                        max(1, args.limit), per_post)
+        finally:
+            if config_backup is not None:
+                if restore_config(config_path, config_backup):
+                    print("[douyin] MediaCrawler 配置已恢复原文（ENABLE_CDP_MODE/"
+                          "ENABLE_GET_MEIDAS 均还原）")
+        refresh_login_state_after_run(args.mc_dir)  # 扫码成功生成缓存后立即登记
+        if rc != 0:
+            print("[douyin] MediaCrawler 运行失败（%s），日志末尾:\n%s" % (
+                "超时" if rc is None else "退出码 %s" % rc,
+                "\n".join(tail[-15:]) or "(无输出)"), file=sys.stderr)
+            sys.exit(2)
+        new_contents = read_delta(contents_p, off_c)
+        new_comments = read_delta(comments_p, off_m)
+        return convert_rows(new_contents, new_comments, [kw],
+                            args.top_comments, args.query.strip(),
+                            args.days, args.sort)
+
+    records, (win_kept, win_dropped, win_unknown) = run_keyword(args.query.strip())
+    if not records:
+        dq = lexicon.strip_scenario_words(args.query.strip())
+        if dq:
+            print("[douyin] 0 命中，剥场景词降级重搜: %s" % dq)
+            records, (win_kept, win_dropped, win_unknown) = run_keyword(dq)
     if not records:
         print("[douyin] 未写出任何记录（本次运行无新增结果或 %s；若刚跨零点属正常"
               "日期文件切换）。" % window_stat_seg(
