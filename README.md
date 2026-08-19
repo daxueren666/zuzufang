@@ -1,6 +1,6 @@
 # 租租房 rent-assist
 
-> 一个通用 Agent Skill：一句白话提问，它把公开口碑扒清楚，出一份带地图、能点回原帖的可视化报告。
+Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社交媒体来找租房攻略和信息，但是这些信息又都散落在各个平台里面。所以我索性做了这个 skill：你输入需求，skill 帮你收集真实的用户讨论和房源信息，再也不用各个平台来回跑，最后还给你一份详细的租房报告，手机端电脑端都能查看。
 
 ![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![PolyForm NC](https://img.shields.io/badge/license-PolyForm%20NC-orange) ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 
@@ -30,9 +30,24 @@
 
 一段时间后出一份 HTML 报告（手机直接看），附一句话结论和"适合什么样的人"。同一小区 7 天内再问，直接复用上次数据，不重采。
 
+## 准备
+
+要用什么就准备什么——缺哪项，对应功能自动跳过并在报告里说明，不阻塞其他功能：
+
+| 功能 | 需要准备 | 一次性操作 |
+|---|---|---|
+| 基础（采集/清洗/报告） | Python 3.11+，能执行本地命令的 CLI agent（Claude Code、Codex CLI 等） | — |
+| 小红书源 | Chrome 浏览器 | 装 Agent-Reach 后执行 `opencli xiaohongshu login`，扫码一次 |
+| 豆瓣源 | — | 首次采集会弹浏览器，登录一次，之后免扫 |
+| 抖音源 | — | 首次采集用抖音 App 扫码一次，之后免扫 |
+| 地图 | 高德 key（免费，申请步骤见下方「可选配置」） | — |
+
+安装 Agent-Reach（采集的统一入口）：从 [github.com/Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach) 按其 README 安装，然后执行一次 `agent-reach install --system`。注意：PyPI 上的同名包是冒名包，不要 `pip install agent-reach`。
+
 ## 安装
 
 ```bash
+# <你的 skills 目录> = 你所用 agent 的技能目录，见下方说明
 git clone https://github.com/daxueren666/zuzufang <你的 skills 目录>/rent-assist
 
 pip install -r <你的 skills 目录>/rent-assist/requirements.txt
@@ -41,7 +56,11 @@ pip install -r <你的 skills 目录>/rent-assist/requirements.txt
 python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 ```
 
-> 完整功能需要能执行本地命令的 CLI agent（采集要跑 Python、扫码登录）；网页版聊天环境只能把它当租房知识库用。
+「你的 skills 目录」= 你所用的 agent 加载技能的文件夹，clone 进去即可被识别：
+
+- Claude Code：`~/.claude/skills/`（Windows：`%USERPROFILE%\.claude\skills\`）
+- Codex CLI：`~/.codex/skills/`
+- 其他支持 Skills 开放格式的 agent（Gemini CLI、Cursor 等）：见各自文档，格式通用
 
 ## 可选配置
 
@@ -57,8 +76,6 @@ AMAP_JSAPI_KEY=Web端JS_API的Key
 AMAP_JSAPI_SECRET=JS_API的安全密钥
 JINA_API_KEY=可选，jina.ai/reader 免费申请，提升网页源采集限额
 ```
-
-**首次使用**：部分数据源需扫码登录一次，之后免扫；排障见 `references/auth.md`。
 
 **数据与隐私**：数据、密钥、登录态全部落在本机，不上传——默认 `~/.rent-assist/`，可用环境变量 RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS 改位置，`check_deps.py` 会打印实际位置。开发环境为 Windows。
 
