@@ -356,10 +356,10 @@
           </svg>
         </button>
       </form>
-      <p class="lvlab">采集量级（不选默认标准）：</p>
+      <p class="lvlab">采集量级（不选默认轻量）：</p>
       <div class="lvrow" id="lvrow" role="group" aria-label="采集量级">
-        <button class="lv" type="button" data-tag="轻量 60 条">轻量<b>60 条</b><small>约 20 分钟</small></button>
-        <button class="lv on" type="button" data-tag="标准 150 条">标准<b>150 条</b><small>约 1 小时</small></button>
+        <button class="lv on" type="button" data-tag="轻量 60 条">轻量<b>60 条</b><small>约 20 分钟</small></button>
+        <button class="lv" type="button" data-tag="标准 150 条">标准<b>150 条</b><small>约 1 小时</small></button>
         <button class="lv" type="button" data-tag="深度 300 条">深度<b>300 条</b><small>约 2 小时</small></button>
       </div>
       <p class="hintline" id="hintline" role="status"></p>
@@ -750,7 +750,7 @@ function copyFlow(text){
 }
 
 /* ---------------- 量级三档 pill ---------------- */
-var lvTag='标准 150 条';
+var lvTag='轻量 60 条';
 $('lvrow').addEventListener('click',function(e){
   var b=e.target.closest('.lv');if(!b)return;
   this.querySelectorAll('.lv').forEach(function(x){x.classList.remove('on');});

@@ -861,8 +861,13 @@ def main():
                     time.sleep(s * args.sleep_scale)
                 batch_no += 1
                 # 配额钳位：剩余配额小于批次上限时，把剩余量直接作为本批 --limit
-                # （子脚本只抓配额内的量；并行 worker 走本函数同样生效）
+                # （子脚本只抓配额内的量；并行 worker 走本函数同样生效）。
+                # 剩余≤0 说明复用闸门已计满配额，跳过本批（stops 稍后置位），
+                # 不再多跑 limit=1 的一批。
                 remaining = share.get(p, 0) - collected.get(p, 0)
+                if share.get(p) and remaining <= 0:
+                    stops[p] = "quota"
+                    continue
                 batch_lim = (max(1, min(args.batch_limit, remaining))
                              if share.get(p) else args.batch_limit)
                 rc, out, err, el, cmd = run_one_batch(args.scripts_dir, p, q, args,
