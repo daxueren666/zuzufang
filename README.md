@@ -1,6 +1,6 @@
 # 租租房 rent-assist
 
-> 一个通用 Agent Skill：装进支持 Skills 开放格式的编程助手（Claude Code / Codex / Gemini CLI / Cursor 等），一句白话提问，它把公开口碑扒清楚，出一份带地图、能点回原帖的可视化报告。
+> 一个通用 Agent Skill：一句白话提问，它把公开口碑扒清楚，出一份带地图、能点回原帖的可视化报告。
 
 ![Agent Skill](https://img.shields.io/badge/Agent%20Skill-开放格式-blue) ![MIT](https://img.shields.io/badge/license-MIT-green) ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 
@@ -33,15 +33,12 @@
 ## 安装
 
 ```bash
-git clone https://github.com/daxueren666/zuzufang <skills目录>/rent-assist
-# Claude Code → ~/.claude/skills/（Windows: %USERPROFILE%\.claude\skills\）
-# Codex CLI  → ~/.codex/skills/
-# Gemini CLI / Cursor / OpenCode 等其他支持 Skills 开放格式的 agent → 各自的 skills 目录
+git clone https://github.com/daxueren666/zuzufang <你的 skills 目录>/rent-assist
 
-pip install -r <skills目录>/rent-assist/requirements.txt
+pip install -r <你的 skills 目录>/rent-assist/requirements.txt
 
 # 依赖自检：缺什么、怎么补，它会逐项告诉你
-python <skills目录>/rent-assist/scripts/check_deps.py
+python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 ```
 
 > 完整功能需要能执行本地命令的 CLI agent（采集要跑 Python、扫码登录）；网页版聊天环境只能把它当租房知识库用。
