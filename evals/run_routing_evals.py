@@ -28,7 +28,7 @@ EXPECTED = {
     4:  {"intent": "D", "compound": None, "gates": {}},
     5:  {"intent": "E", "compound": None, "gates": {}},
     6:  {"intent": "A", "compound": None, "gates": {}},
-    7:  {"intent": "B_DRILLDOWN", "compound": None, "gates": {}},
+    7:  {"intent": "B", "compound": None, "gates": {}},
     8:  {"intent": "ASK_CITY", "compound": None, "gates": {}},
     9:  {"intent": "C+D", "compound": ["C", "D"], "gates": {}},
     10: {"intent": "A+E", "compound": ["A", "E"], "gates": {}},
@@ -43,9 +43,6 @@ EXPECTED = {
          "gates": {"noise": "open"}},
     18: {"intent": "A", "compound": None, "gates": {}},
 }
-
-# 超大片区词表（模拟 SKILL.md 的超大片区判断）
-MEGA_AREAS = ("天通苑", "回龙观", "康城")
 
 # 城市锚点词表（城市可由地标推知，否则视为缺失）
 CITY_ANCHORS = {
@@ -90,10 +87,8 @@ def classify(text: str) -> str:
     # 复合拆分：C+D（住哪 + 转租房源）
     if re.search(r"住哪合适|住哪好", text) and re.search(r"转租的房源|个人转租", text):
         return "C+D"
-    # B：值得租/推荐/住哪个子小区
+    # B：值得租/推荐/住哪个子小区（超大片区不再特殊分支：搜索词同口径，子区对比在分析层）
     if re.search(r"值得租|值不值|推荐|住哪个区合适|住哪个小区合适", text):
-        if re.search(r"|".join(MEGA_AREAS), text):
-            return "B_DRILLDOWN"
         return "B"
 
     # C：选址建议（无标的，问住哪）
@@ -103,10 +98,6 @@ def classify(text: str) -> str:
     # D：找房/房源/直租（位置词而非标的）
     if re.search(r"找个一居室|直租|个人转租|房源|女生合租", text):
         return "D"
-
-    # A_DRILLDOWN：超大片区且问题需要子小区粒度（收窄后：整体问法不下钻）
-    if re.search(r"|".join(MEGA_AREAS), text) and re.search(r"住哪个|哪个区合适|子小区|本区.*东区|东区.*本区", text):
-        return "A_DRILLDOWN"
 
     # A_ASK_INFO：房东/中介人名标的，信息过泛需反问
     if re.search(r"叫王伟的房东|房东要租我房子", text):
