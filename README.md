@@ -24,11 +24,11 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 
 ## 装好后怎么用
 
-对你的 AI 助手说人话就行。它会追问缺的信息（城市、预算、量级），确认后开始采集分析：
+打开你的 AI 助手（如果它没认出这个技能，重启一次让它重新加载），直接说人话。它会追问缺的信息（城市、预算、量级），确认后开始采集分析：
 
 > 帮我查下回龙观龙泽苑的租房口碑，预算 3000，合租
 
-一段时间后出一份 HTML 报告（手机直接看），附一句话结论和"适合什么样的人"。同一小区 7 天内再问，直接复用上次数据，不重采。
+时长看选的量级：轻量约 20 分钟、标准约 1 小时（它会先让你选）。完成后出一份 HTML 报告，落在 `~/.rent-assist/data/reports/`（手机直接看），附一句话结论和"适合什么样的人"。同一小区 7 天内再问，直接复用上次数据，不重采。
 
 ## 准备
 
@@ -36,13 +36,15 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 
 | 功能 | 需要准备 | 一次性操作 |
 |---|---|---|
-| 基础（采集/清洗/报告） | Python 3.11+，能执行本地命令的 CLI agent（Claude Code、Codex CLI 等） | — |
+| 基础（采集/清洗/报告） | Python 3.11+（终端跑 `python --version` 确认）；一个能在终端里执行命令的 AI 助手，如 [Claude Code](https://claude.com/claude-code) 或 [Codex CLI](https://github.com/openai/codex) | — |
 | 小红书源 | Chrome 浏览器 | 装好 Agent-Reach 与 Chrome 扩展后扫码登录一次（命令见下） |
-| 豆瓣源 | — | 首次采集会弹浏览器，登录一次，之后免扫 |
-| 抖音源 | — | 首次采集用抖音 App 扫码一次，之后免扫 |
+| 豆瓣源 | — | 首次采集会弹浏览器，登录一次 |
+| 抖音源 | — | 首次采集用抖音 App 扫码一次 |
 | 地图 | 高德 key（免费，申请步骤见下方「可选配置」） | — |
 
 ### 装 Agent-Reach（采集的统一入口，一次性）
+
+打开终端（Windows 用 PowerShell，macOS 用终端），逐条粘贴运行：
 
 ```bash
 # 1) 安装（pipx 优先）
@@ -56,7 +58,7 @@ agent-reach install --env=auto --system
 **注意：只能用上面的 GitHub 地址安装。PyPI 上的同名包 agent-reach 是冒名包，不要 `pip install agent-reach`。**
 
 <details>
-<summary>没有 pipx / macOS 报 PEP 668 / Windows 商店版 Python（点开看对应命令）</summary>
+<summary>pipx 装不上 / macOS 报 PEP 668 / Windows 商店版 Python：替代装法</summary>
 
 ```bash
 # macOS / Linux（Homebrew Python 报 externally-managed-environment 时）
@@ -94,6 +96,8 @@ opencli doctor
 
 ## 安装
 
+同样在终端里，逐条运行（`<你的 skills 目录>` 是什么，见代码块下方说明）：
+
 ```bash
 # <你的 skills 目录> = 你所用 agent 的技能目录，见下方说明
 git clone https://github.com/daxueren666/zuzufang <你的 skills 目录>/rent-assist
@@ -108,7 +112,7 @@ python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 
 - Claude Code：`~/.claude/skills/`（Windows：`%USERPROFILE%\.claude\skills\`）
 - Codex CLI：`~/.codex/skills/`
-- 其他支持 Skills 开放格式的 agent（Gemini CLI、Cursor 等）：见各自文档，格式通用
+- 其他 agent（Gemini CLI、Cursor 等）：一般在其配置目录下的 `skills/` 文件夹，技能格式通用
 
 ## 可选配置
 
@@ -125,9 +129,15 @@ AMAP_JSAPI_SECRET=JS_API的安全密钥
 JINA_API_KEY=可选，jina.ai/reader 免费申请，提升网页源采集限额
 ```
 
-**数据与隐私**：数据、密钥、登录态全部落在本机，不上传——默认 `~/.rent-assist/`，可用环境变量 RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS 改位置，`check_deps.py` 会打印实际位置。开发环境为 Windows。
+## 数据与隐私
 
-使用中遇到问题：[开个 issue](https://github.com/daxueren666/zuzufang/issues)。
+数据、密钥、登录态全部落在本机，不上传——默认 `~/.rent-assist/`，可用环境变量 RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS 改位置，`check_deps.py` 会打印实际位置。
+
+## 遇到问题
+
+1. 小红书相关报错：终端跑 `opencli doctor`，没有出现 `Extension: connected` = Chrome 扩展没装好或 Chrome 没开
+2. 整体自检：跑「安装」节最后一条 `check_deps.py`，缺什么它会逐项告诉你
+3. 还是不行：[开个 issue](https://github.com/daxueren666/zuzufang/issues)
 
 ## 边界（必读）
 
