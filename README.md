@@ -37,12 +37,50 @@ Vibe Coding 这个项目，是因为我发现越来越多的人开始通过社�
 | 功能 | 需要准备 | 一次性操作 |
 |---|---|---|
 | 基础（采集/清洗/报告） | Python 3.11+，能执行本地命令的 CLI agent（Claude Code、Codex CLI 等） | — |
-| 小红书源 | Chrome 浏览器 | 装 Agent-Reach 后执行 `opencli xiaohongshu login`，扫码一次 |
+| 小红书源 | Chrome 浏览器 | 装 Agent-Reach + Chrome 扩展后 `opencli xiaohongshu login`，扫码一次 |
 | 豆瓣源 | — | 首次采集会弹浏览器，登录一次，之后免扫 |
 | 抖音源 | — | 首次采集用抖音 App 扫码一次，之后免扫 |
 | 地图 | 高德 key（免费，申请步骤见下方「可选配置」） | — |
 
-安装 Agent-Reach（采集的统一入口）：从 [github.com/Panniantong/Agent-Reach](https://github.com/Panniantong/Agent-Reach) 按其 README 安装，然后执行一次 `agent-reach install --system`。注意：PyPI 上的同名包是冒名包，不要 `pip install agent-reach`。
+### 装 Agent-Reach（采集的统一入口，一次性）
+
+```bash
+# 1) 安装（pipx 优先）
+pipx install https://github.com/Panniantong/agent-reach/archive/main.zip
+
+# 2) 先只读检查环境，确认无误后装系统依赖
+agent-reach install --env=auto
+agent-reach install --env=auto --system
+```
+
+**注意：只能用上面的 GitHub 地址安装。PyPI 上的同名包 agent-reach 是冒名包，不要 `pip install agent-reach`。**
+
+<details>
+<summary>没有 pipx / macOS 报 PEP 668 / Windows 商店版 Python（点开看对应命令）</summary>
+
+```bash
+# macOS / Linux（Homebrew Python 报 externally-managed-environment 时）
+python3 -m venv ~/.agent-reach-venv && source ~/.agent-reach-venv/bin/activate
+pip install https://github.com/Panniantong/agent-reach/archive/main.zip
+agent-reach install --env=auto --system
+```
+
+```powershell
+# Windows（PowerShell，装的是 Microsoft Store 版 Python 时）
+py -3 -m venv $env:USERPROFILE\.agent-reach-venv
+$env:USERPROFILE\.agent-reach-venv\Scripts\Activate.ps1
+python -m pip install https://github.com/Panniantong/agent-reach/archive/main.zip
+agent-reach install --env=auto --system
+```
+
+</details>
+
+### 小红书还要两步（其他源不用）
+
+1. Chrome 装 OpenCLI 扩展：打开 [Chrome 应用商店的 OpenCLI 页面](https://chromewebstore.google.com/detail/opencli/ildkmabpimmkaediidaifkhjpohdnifk)，点「添加至 Chrome」（浏览器扩展不允许命令行代装，这是全程唯一的手动步骤）
+2. 执行 `opencli xiaohongshu login`：会拉起 Chrome 扫码登录小红书，一次即可；`opencli doctor` 显示 `Extension: connected` 就通了
+
+装完跑下面安装节的 `check_deps.py` 做总验证。
 
 ## 安装
 
