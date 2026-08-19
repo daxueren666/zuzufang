@@ -168,10 +168,10 @@ python <skill>/scripts/check_deps.py
 
 ## 工作流 E：租房咨询（意图 E）
 
-不采集任何数据、不跑清洗。**直答是主体，报告是可选**：
+不采集任何数据、不跑清洗，两步走（先直答、再出报告——报告是固定交付物，必出）：
 
 1. **直接答**：读 `references/checklist.md`，定位与问题对应的阶段小节，结合问题具体作答（可引用清单条目），答案直接写在回复里，不让用户等报告。
-2. **FAQ 可视化报告（用户要才出）**：答完问一句"要不要整理成一份可保存/分享的清单报告？"，用户要才把答案整理成 `mode = "faq"` 的 analysis.json 跑 render.py 出报告落 `<data>/reports/`（页面提交且用户勾选了报告时直接出）；
+2. **FAQ 可视化报告**：把答案整理成 `mode = "faq"` 的 analysis.json，跑 render.py 出报告落 `<data>/reports/`：
    - `question` 用用户问题原话；`sections` 2-4 个分节、每节 3-6 要点；`risk_notes` 风险提示；`action_checklist` 可勾选行动清单。
    - 不传 `--cleaned`/`--geo`，秒出。
    - **诚实边界**：faq 报告基于通用知识与会话材料（checklist 等），无平台数据支撑，报告中如实标注。
