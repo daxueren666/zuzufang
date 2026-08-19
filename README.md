@@ -43,19 +43,26 @@ python <你的 skills 目录>/rent-assist/scripts/check_deps.py
 
 > 完整功能需要能执行本地命令的 CLI agent（采集要跑 Python、扫码登录）；网页版聊天环境只能把它当租房知识库用。
 
-- **地图功能需自备高德 key**（免费；不填则报告自动降级为纯文字版，其余功能不受影响）：
-  1. 注册 [lbs.amap.com](https://lbs.amap.com)，完成个人实名认证
-  2. 控制台 → 应用管理 → 创建新应用 → 添加两个 Key：服务平台分别选「Web 服务」和「Web 端（JS API）」（JS API 会同时给一个安全密钥）
-  3. 写入 `~/.rent-assist/keys.env`（KEY=VALUE 纯文本，与 skill 目录分离）：
+## 可选配置
 
-     ```ini
-     AMAP_WEB_KEY=Web服务的Key
-     AMAP_JSAPI_KEY=Web端JS_API的Key
-     AMAP_JSAPI_SECRET=JS_API的安全密钥
-     JINA_API_KEY=可选，提升网页源采集限额
-     ```
-- 部分数据源首次使用需扫码登录一次，之后免扫（排障见 `references/auth.md`）
-- 数据/工具/密钥目录自动解析：环境变量（RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS）可覆盖，默认 `~/.rent-assist/` 下；`check_deps.py` 会打印实际位置。开发环境为 Windows
+**地图（高德 key，免费）**——不填则报告自动降级为纯文字版，其余功能不受影响：
+
+1. 注册 [lbs.amap.com](https://lbs.amap.com)，完成个人实名认证
+2. 控制台 → 应用管理 → 创建新应用 → 添加两个 Key：服务平台分别选「Web 服务」和「Web 端（JS API）」（JS API 会同时给一个安全密钥）
+3. 写入 `~/.rent-assist/keys.env`（KEY=VALUE 纯文本，与 skill 目录分离）：
+
+```ini
+AMAP_WEB_KEY=Web服务的Key
+AMAP_JSAPI_KEY=Web端JS_API的Key
+AMAP_JSAPI_SECRET=JS_API的安全密钥
+JINA_API_KEY=可选，jina.ai/reader 免费申请，提升网页源采集限额
+```
+
+**首次使用**：部分数据源需扫码登录一次，之后免扫；排障见 `references/auth.md`。
+
+**数据与隐私**：数据、密钥、登录态全部落在本机，不上传——默认 `~/.rent-assist/`，可用环境变量 RENT_ASSIST_DATA / RENT_ASSIST_TOOLS / RENT_ASSIST_KEYS 改位置，`check_deps.py` 会打印实际位置。开发环境为 Windows。
+
+使用中遇到问题：[开个 issue](https://github.com/daxueren666/zuzufang/issues)。
 
 ## 边界（必读）
 
